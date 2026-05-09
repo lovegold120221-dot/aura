@@ -21,16 +21,24 @@ export const startDeepgramTranscription = async (
       language: 'multi',
       smart_format: true,
       interim_results: true,
-      utterance_end_ms: 1000,
-      endpointing: 10,
+      utterance_end_ms: 2000,
+      endpointing: 1000,
       vad_events: true,
       numerals: true,
     } as any);
 
+    let sentenceBuffer = '';
+
     connection.on('open', async () => {
       console.log('Deepgram Connection opened.');
 
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        }
+      });
       mediaRecorder = new MediaRecorder(stream, {
         mimeType: 'audio/webm',
       });
@@ -48,14 +56,39 @@ export const startDeepgramTranscription = async (
       if (data.type === 'SpeechStarted') {
         onSpeechStarted();
       }
-      if (data.type === 'UtteranceEnd') {
-        onSpeechEnded();
-      }
+      
       if (data.type === 'Results' && data.channel?.alternatives?.[0]) {
         const transcript = data.channel.alternatives[0].transcript;
-        if (transcript) {
-          onTranscript(transcript, data.is_final);
+        
+        if (data.is_final) {
+          if (transcript) {
+            sentenceBuffer += (sentenceBuffer ? ' ' : '') + transcript;
+          }
+          if (data.speech_final) {
+            const finalSentence = sentenceBuffer;
+            sentenceBuffer = '';
+            if (finalSentence.trim().length > 0) {
+              onTranscript(finalSentence.trim(), true);
+            }
+          } else {
+            onTranscript(sentenceBuffer.trim(), false);
+          }
+        } else {
+          // It's an interim result
+          const interimSentence = sentenceBuffer + (sentenceBuffer ? ' ' : '') + (transcript || '');
+          if (interimSentence.trim().length > 0) {
+            onTranscript(interimSentence.trim(), false);
+          }
         }
+      }
+
+      if (data.type === 'UtteranceEnd') {
+        if (sentenceBuffer.trim().length > 0) {
+          const finalSentence = sentenceBuffer;
+          sentenceBuffer = '';
+          onTranscript(finalSentence.trim(), true);
+        }
+        onSpeechEnded();
       }
     });
 

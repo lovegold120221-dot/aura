@@ -5,7 +5,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Mic, MicOff, History, Cpu, Zap, Activity, ShieldCheck, Settings, Play, Volume2, RotateCcw, PanelRightClose, PanelRightOpen, Languages, Ghost, Square, LogOut, Sun, Moon, User as UserIcon, Mail } from 'lucide-react';
+import { Mic, MicOff, History, Cpu, Zap, Activity, ShieldCheck, Settings, Play, Volume2, VolumeX, RotateCcw, PanelRightClose, PanelRightOpen, Languages, Ghost, Square, LogOut, Sun, Moon, User as UserIcon, Mail } from 'lucide-react';
 import { analyzeText, speakTranslation } from './services/geminiService';
 import { startDeepgramTranscription, stopDeepgramTranscription } from './services/deepgramService';
 import { auth, rtdb } from './services/firebase';
@@ -33,6 +33,7 @@ export default function App() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
   const [currentEmotion, setCurrentEmotion] = useState<string | null>(null);
@@ -146,7 +147,7 @@ export default function App() {
               }
             }
 
-            if (analysis.translation) {
+            if (analysis.translation && !isMuted) {
               setIsSpeaking(true);
               await speakTranslation(analysis.translation, analysis.emotion);
               setIsSpeaking(false);
@@ -466,8 +467,11 @@ export default function App() {
              >
                {isListening ? <Mic className="w-5 h-5 sm:w-6 sm:h-6 animate-pulse" /> : <MicOff className="w-5 h-5 sm:w-6 sm:h-6" />}
              </button>
-             <button className="p-2.5 sm:p-3 text-gray-400 hover:text-white transition-colors">
-               <Volume2 className="w-5 h-5 sm:w-6 sm:h-6" />
+             <button 
+               onClick={() => setIsMuted(!isMuted)}
+               className={`p-2.5 sm:p-3 rounded-full transition-all active:scale-95 ${isMuted ? 'bg-gray-500/10 text-gray-500' : 'text-blue-400 hover:text-white'}`}
+             >
+               {isMuted ? <VolumeX className="w-5 h-5 sm:w-6 sm:h-6" /> : <Volume2 className="w-5 h-5 sm:w-6 sm:h-6" />}
              </button>
              <button 
                onClick={() => {
