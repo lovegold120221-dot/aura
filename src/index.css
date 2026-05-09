@@ -17,6 +17,7 @@ body {
   margin: 0;
   overflow: hidden;
   font-family: var(--font-sans);
+  touch-action: pan-y;
 }
 
 .no-scrollbar::-webkit-scrollbar {

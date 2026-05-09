@@ -16,7 +16,7 @@ export const startDeepgramTranscription = async (
   try {
     const deepgram = new DeepgramClient({ apiKey: DEEPGRAM_API_KEY });
 
-    connection = deepgram.listen.v1.connect({
+    connection = await deepgram.listen.v1.connect({
       model: 'nova-3',
       language: 'multi',
       smart_format: true,
@@ -85,7 +85,7 @@ export const stopDeepgramTranscription = () => {
     stream.getTracks().forEach((track) => track.stop());
   }
   if (connection) {
-    connection.socket?.close();
+    connection.close();
   }
   mediaRecorder = null;
   stream = null;

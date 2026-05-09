@@ -51,10 +51,24 @@ export default function App() {
       // onTranscript
       async (text: string, isFinal: boolean) => {
         if (!isFinal) {
-          setStreamingInteraction(prev => ({ ...prev, text: text }));
+          setStreamingInteraction(prev => ({ 
+            id: prev?.id || Date.now().toString(),
+            timestamp: prev?.timestamp || Date.now(),
+            type: 'user', 
+            text: text, 
+            translation: prev?.translation || 'Listening...',
+            language: prev?.language,
+            emotion: prev?.emotion
+          }));
         } else {
           // Received final transcript utterance
-          setStreamingInteraction({ type: 'user', text: text, translation: 'Translating...' });
+          setStreamingInteraction({ 
+            id: Date.now().toString(),
+            timestamp: Date.now(),
+            type: 'user', 
+            text: text, 
+            translation: 'Translating...' 
+          });
           setIsProcessing(true);
           
           try {
@@ -219,13 +233,13 @@ export default function App() {
       {/* Main UI */}
       <div className="flex-1 flex flex-col h-full relative">
         {/* Header */}
-        <header className="h-16 px-6 flex justify-between items-center border-b border-white/5 bg-[#1a1c1e] z-10 shrink-0">
-          <div className="p-2 rounded-lg bg-[#2d3034] border border-white/10">
+        <header className="h-16 px-4 sm:px-6 flex justify-between items-center border-b border-white/5 bg-[#1a1c1e] z-10 shrink-0">
+          <div className="hidden sm:flex p-2 rounded-lg bg-[#2d3034] border border-white/10">
              <Zap className="w-5 h-5 text-gray-200 fill-current opacity-70" />
           </div>
           
           {/* Audio Visualizer - Header Center */}
-          <div className="flex items-center gap-[3px] h-6 px-4">
+          <div className="flex items-center gap-[2px] sm:gap-[3px] h-6 px-2 sm:px-4">
             {Array.from({ length: 12 }).map((_, i) => (
               <motion.div
                 key={i}
@@ -242,11 +256,11 @@ export default function App() {
             ))}
           </div>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             <select 
               value={targetLanguage} 
               onChange={(e) => setTargetLanguage(e.target.value)}
-              className="bg-[#2d3034] text-xs font-mono border border-white/10 rounded-lg px-2 py-1 text-gray-300 outline-none hover:border-white/20 transition-colors"
+              className="bg-[#2d3034] text-[10px] sm:text-xs font-mono border border-white/10 rounded-lg px-2 py-1 text-gray-300 outline-none hover:border-white/20 transition-colors w-24 sm:w-auto truncate"
             >
               <option value="Dutch Flemish">Flemish</option>
               <option value="English">English</option>
@@ -257,34 +271,34 @@ export default function App() {
             </select>
             <button 
               onClick={() => setShowSidebar(true)}
-              className="p-2 text-gray-400 hover:text-white transition-colors"
+              className="p-1.5 sm:p-2 text-gray-400 hover:text-white transition-colors"
             >
               <PanelRightOpen className="w-5 h-5" />
             </button>
-            <button className="p-2 text-gray-400 hover:text-white transition-colors">
+            <button className="hidden sm:block p-1.5 sm:p-2 text-gray-400 hover:text-white transition-colors">
               <Settings className="w-5 h-5" />
             </button>
           </div>
         </header>
 
         {/* Content Area */}
-        <main className="flex-1 flex flex-col items-center justify-start gap-12 px-6 py-12 pb-32 overflow-y-auto no-scrollbar">
-           <div className="w-full max-w-2xl space-y-12">
+        <main className="flex-1 flex flex-col items-center justify-start gap-8 sm:gap-12 px-4 sm:px-6 py-6 sm:py-12 pb-32 sm:pb-32 overflow-y-auto no-scrollbar">
+           <div className="w-full max-w-2xl space-y-8 sm:space-y-12">
               {/* Transcription Area */}
-              <div className="space-y-3">
-                <h3 className="input-label">Transcription</h3>
-                <div className="w-full min-h-[180px] p-8 rounded-[40px] border border-emerald-500/10 bg-emerald-500/[0.02] dark-container flex flex-col gap-6">
+              <div className="space-y-2 sm:space-y-3">
+                <h3 className="input-label ml-2 sm:ml-0">Transcription</h3>
+                <div className="w-full min-h-[150px] sm:min-h-[180px] p-6 sm:p-8 rounded-[32px] sm:rounded-[40px] border border-emerald-500/10 bg-emerald-500/[0.02] dark-container flex flex-col gap-4 sm:gap-6">
                    {isListening ? (
                      <div className="flex-1 flex items-center">
-                       <span className="flex items-center gap-3 text-emerald-400 text-2xl font-medium">
-                          <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
+                       <span className="flex items-center gap-3 text-emerald-400 text-xl sm:text-2xl font-medium">
+                          <span className="w-2 sm:w-2.5 h-2 sm:h-2.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
                           Listening...
                        </span>
                      </div>
                    ) : isProcessing ? (
                      <div className="flex-1 flex items-center">
-                       <span className="italic opacity-50 flex items-center gap-2 text-2xl font-medium text-gray-400">
-                          <Cpu className="w-6 h-6 animate-spin" />
+                       <span className="italic opacity-50 flex items-center gap-2 text-xl sm:text-2xl font-medium text-gray-400">
+                          <Cpu className="w-5 h-5 sm:w-6 sm:h-6 animate-spin" />
                           Syncing Neural Bridge...
                        </span>
                      </div>
@@ -292,57 +306,57 @@ export default function App() {
                      <>
                        <div className="flex justify-between items-center">
                          <div className="flex gap-2">
-                           <span className="text-[10px] font-mono font-bold px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-wider">
+                           <span className="text-[10px] font-mono font-bold px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-wider hidden sm:block">
                              {lastInteraction.language || 'Detecting'}
                            </span>
                            <span className="text-[10px] font-mono font-bold px-2 py-1 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 uppercase tracking-wider">
                              {lastInteraction.emotion || 'Neutral'}
                            </span>
                          </div>
-                         <span className="text-[10px] text-emerald-400/50 font-mono tracking-widest uppercase font-bold text-right">
+                         <span className="text-[9px] sm:text-[10px] text-emerald-400/50 font-mono tracking-widest uppercase font-bold text-right">
                            Source Input
                          </span>
                        </div>
-                       <p className="text-2xl font-medium text-gray-300 leading-relaxed">
+                       <p className="text-xl sm:text-2xl font-medium text-gray-300 leading-relaxed">
                          {lastInteraction.text}
                        </p>
                      </>
                    ) : (
                      <div className="flex-1 flex items-center justify-center">
-                        <span className="opacity-10 italic text-xl">Awaiting pulse...</span>
+                        <span className="opacity-10 italic text-lg sm:text-xl">Awaiting pulse...</span>
                      </div>
                    )}
                 </div>
               </div>
 
               {/* Translation Area */}
-              <div className="space-y-3">
-                <h3 className="translation-label text-blue-400">
+              <div className="space-y-2 sm:space-y-3">
+                <h3 className="translation-label text-blue-400 ml-2 sm:ml-0">
                   Translation {lastInteraction?.language && isTargetLanguage(lastInteraction.language, targetLanguage) ? `(${lastNonTargetLanguage || 'Fallback'})` : `(${targetLanguage})`}
                 </h3>
-                <div className="w-full min-h-[180px] p-8 rounded-[40px] border border-blue-400/10 bg-blue-400/[0.02] dark-container flex flex-col gap-6">
+                <div className="w-full min-h-[150px] sm:min-h-[180px] p-6 sm:p-8 rounded-[32px] sm:rounded-[40px] border border-blue-400/10 bg-blue-400/[0.02] dark-container flex flex-col gap-4 sm:gap-6">
                    {lastInteraction ? (
                      <>
                        <div className="flex justify-between items-center">
                          <div className="flex gap-2">
-                           <span className="text-[10px] font-mono font-bold px-2 py-1 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 uppercase tracking-wider">
+                           <span className="text-[10px] font-mono font-bold px-2 py-1 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 uppercase tracking-wider hidden sm:block">
                              {lastInteraction.language && isTargetLanguage(lastInteraction.language, targetLanguage) ? (lastNonTargetLanguage || 'Fallback') : targetLanguage}
                            </span>
                            <span className="text-[10px] font-mono font-bold px-2 py-1 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 uppercase tracking-wider">
                              {lastInteraction.emotion || 'Neutral'}
                            </span>
                          </div>
-                         <span className="text-[10px] text-blue-400/50 font-mono tracking-widest uppercase font-bold text-right">
+                         <span className="text-[9px] sm:text-[10px] text-blue-400/50 font-mono tracking-widest uppercase font-bold text-right">
                            Neural Output
                          </span>
                        </div>
-                       <p className="text-2xl font-medium text-blue-100 leading-relaxed">
+                       <p className="text-xl sm:text-2xl font-medium text-blue-100 leading-relaxed">
                          {lastInteraction.translation}
                        </p>
                      </>
                    ) : (
                      <div className="flex-1 flex items-center justify-center">
-                        <span className="opacity-10 italic text-xl">Translation bridge idle</span>
+                        <span className="opacity-10 italic text-lg sm:text-xl">Translation bridge idle</span>
                      </div>
                    )}
                 </div>
@@ -351,37 +365,37 @@ export default function App() {
         </main>
 
         {/* Floating Controls */}
-        <div className="fixed bottom-12 left-1/2 -translate-x-1/2 flex items-center gap-4 z-20">
-          <div className="flex items-center gap-6 px-6 py-4 rounded-[32px] bg-[#2d3034] border border-white/5 shadow-2xl">
+        <div className="fixed bottom-6 sm:bottom-12 left-1/2 -translate-x-1/2 flex items-center gap-2 sm:gap-4 z-20 w-[95%] max-w-fit justify-center">
+          <div className="flex items-center gap-2 sm:gap-6 px-4 sm:px-6 py-3 sm:py-4 rounded-[24px] sm:rounded-[32px] bg-[#2d3034] border border-white/5 shadow-2xl">
              <button 
                onClick={handleToggleSession}
-               className={`p-3 rounded-full transition-all active:scale-95 ${isListening ? 'bg-red-500/10 text-red-400' : 'text-gray-400 hover:text-white'}`}
+               className={`p-2.5 sm:p-3 rounded-full transition-all active:scale-95 ${isListening ? 'bg-red-500/10 text-red-400' : 'text-gray-400 hover:text-white'}`}
              >
-               {isListening ? <Mic className="w-6 h-6 animate-pulse" /> : <MicOff className="w-6 h-6" />}
+               {isListening ? <Mic className="w-5 h-5 sm:w-6 sm:h-6 animate-pulse" /> : <MicOff className="w-5 h-5 sm:w-6 sm:h-6" />}
              </button>
-             <button className="p-3 text-gray-400 hover:text-white transition-colors">
-               <Volume2 className="w-6 h-6" />
+             <button className="p-2.5 sm:p-3 text-gray-400 hover:text-white transition-colors">
+               <Volume2 className="w-5 h-5 sm:w-6 sm:h-6" />
              </button>
              <button 
                onClick={() => setInteractions([])}
-               className="p-3 text-gray-400 hover:text-white transition-colors"
+               className="p-2.5 sm:p-3 text-gray-400 hover:text-white transition-colors"
              >
-               <RotateCcw className="w-6 h-6" />
+               <RotateCcw className="w-5 h-5 sm:w-6 sm:h-6" />
              </button>
           </div>
           
           <button 
             onClick={handleToggleSession}
-            className={`w-16 h-16 rounded-[24px] flex items-center justify-center shadow-lg active:scale-95 transition-all ${
+            className={`w-14 h-14 sm:w-16 sm:h-16 shrink-0 rounded-[20px] sm:rounded-[24px] flex items-center justify-center shadow-lg active:scale-95 transition-all ${
               isListening 
                 ? 'bg-red-500 shadow-red-500/20' 
                 : 'bg-[#3B82F6] shadow-blue-500/20'
             }`}
           >
              {isListening ? (
-               <Square className="w-7 h-7 text-white fill-current" />
+               <Square className="w-6 h-6 sm:w-7 sm:h-7 text-white fill-current" />
              ) : (
-               <Play className="w-7 h-7 text-white fill-current" />
+               <Play className="w-6 h-6 sm:w-7 sm:h-7 text-white fill-current" />
              )}
           </button>
         </div>
