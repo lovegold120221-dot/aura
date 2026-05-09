@@ -50,8 +50,8 @@ export function AuthPage() {
         <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-blue-500/5 pointer-events-none" />
         
         <div className="relative z-10 text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/5 border border-white/10 shadow-lg mb-6">
-            <CheckCircle className="w-8 h-8 text-emerald-400" />
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/5 border border-white/10 shadow-lg mb-6 overflow-hidden">
+            <img src="https://eburon.ai/icon-eburon.svg" alt="Eburon Logo" className="w-10 h-10 rounded-full" />
           </div>
           <h1 className="text-2xl font-semibold mb-2">{isLogin ? 'Welcome Back' : 'Create Account'}</h1>
           <p className="text-gray-400 text-sm">

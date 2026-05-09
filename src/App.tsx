@@ -5,7 +5,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Mic, MicOff, History, Cpu, Zap, Activity, ShieldCheck, Settings, Play, Volume2, VolumeX, RotateCcw, PanelRightClose, PanelRightOpen, Languages, Ghost, Square, LogOut, Sun, Moon, User as UserIcon, Mail } from 'lucide-react';
+import { Mic, MicOff, History, Cpu, Zap, Activity, ShieldCheck, Settings, Play, Volume2, VolumeX, RotateCcw, PanelRightClose, PanelRightOpen, Languages, Ghost, Square, LogOut, Sun, Moon, User as UserIcon, Mail, Download } from 'lucide-react';
 import { analyzeText, speakTranslation } from './services/geminiService';
 import { startDeepgramTranscription, stopDeepgramTranscription } from './services/deepgramService';
 import { auth, rtdb } from './services/firebase';
@@ -44,6 +44,24 @@ export default function App() {
   
   const [isDark, setIsDark] = useState(true);
   const [showProfile, setShowProfile] = useState(false);
+
+  const exportHistory = () => {
+    if (interactions.length === 0) return;
+    const exportData = interactions.map(item => ({
+      Timestamp: new Date(item.timestamp).toLocaleString(),
+      Language: item.language || 'Unknown',
+      Emotion: item.emotion || 'Unknown',
+      Transcription: item.text,
+      Translation: item.translation || ''
+    }));
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href",     dataStr);
+    downloadAnchorNode.setAttribute("download", "neural_bridge_archive.json");
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+  };
   
   useEffect(() => {
     if (isDark) {
@@ -317,8 +335,8 @@ export default function App() {
       <div className="flex-1 flex flex-col h-full relative">
         {/* Header */}
         <header className={`h-16 px-4 sm:px-6 flex justify-between items-center border-b ${isDark ? 'border-white/5 bg-[#1a1c1e]' : 'border-gray-200 bg-white'} z-10 shrink-0 transition-colors duration-300`}>
-          <div className={`hidden sm:flex p-2 rounded-lg ${isDark ? 'bg-[#2d3034] border-white/10' : 'bg-gray-100 border-gray-200'} border transition-colors duration-300`}>
-             <Zap className={`w-5 h-5 fill-current ${isDark ? 'text-gray-200 opacity-70' : 'text-emerald-500 opacity-90'}`} />
+          <div className={`hidden sm:flex p-1.5 rounded-full ${isDark ? 'bg-[#2d3034] border-white/10' : 'bg-gray-100 border-gray-200'} border transition-colors duration-300 overflow-hidden`}>
+             <img src="https://eburon.ai/icon-eburon.svg" alt="Eburon Logo" className="w-6 h-6 rounded-full" />
           </div>
           
           {/* Audio Visualizer - Header Center */}
@@ -531,9 +549,17 @@ export default function App() {
                   <History className="w-6 h-6 text-gray-400" />
                   <h2 className="text-xl font-bold tracking-tight">Transcription Archive</h2>
                 </div>
-                <button onClick={() => setShowHistory(false)} className="p-3 bg-white/5 hover:bg-white/10 rounded-full transition-colors">
-                    <RotateCcw className="w-6 h-6 text-gray-300 rotate-90" />
-                </button>
+                <div className="flex items-center gap-4">
+                  {interactions.length > 0 && (
+                    <button onClick={exportHistory} className="flex items-center gap-2 px-4 py-3 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 rounded-full transition-colors text-sm font-bold font-mono tracking-widest uppercase border border-emerald-500/20">
+                      <Download className="w-4 h-4" />
+                      Export
+                    </button>
+                  )}
+                  <button onClick={() => setShowHistory(false)} className="p-3 bg-white/5 hover:bg-white/10 rounded-full transition-colors">
+                      <RotateCcw className="w-6 h-6 text-gray-300 rotate-90" />
+                  </button>
+                </div>
             </div>
             <div className="flex-1 overflow-y-auto p-8 space-y-8 no-scrollbar max-w-4xl mx-auto w-full">
                 {interactions.map(item => (
