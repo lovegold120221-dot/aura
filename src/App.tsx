@@ -196,10 +196,7 @@ export default function App() {
             setConfidence(analysis.confidence || Math.random() * 5 + 94);
 
             if (analysis.language && !isDutchFlemish(analysis.language)) {
-              setLastNonTargetLanguage(prev => prev || analysis.language);
-              if (targetLanguage === 'Multilingual') {
-                setTargetLanguage(analysis.language);
-              }
+              setLastNonTargetLanguage(analysis.language);
             }
 
             if (analysis.translation && !isMuted) {
@@ -207,7 +204,11 @@ export default function App() {
             }
           } catch (err: any) {
             console.error(err);
-            setErrorMessage(err.message || String(err));
+            if (err?.message?.includes("quota") || err?.status === 429 || err?.message?.includes("exceeded")) {
+              setErrorMessage("You exceeded your current quota for translation. Please check your billing details.");
+            } else {
+              setErrorMessage(err.message || String(err));
+            }
             setTimeout(() => setErrorMessage(null), 8000);
             setStreamingInteraction(null);
           } finally {
@@ -263,6 +264,14 @@ export default function App() {
     setDeepgramMuted(true);
     try {
       await speakTranslation(text, emotion);
+    } catch (err: any) {
+      console.error(err);
+      if (err?.message?.includes("quota") || err?.status === 429 || err?.message?.includes("exceeded")) {
+        setErrorMessage("You exceeded your current quota for translation audio. Please check your billing details.");
+      } else {
+        setErrorMessage(err.message || String(err));
+      }
+      setTimeout(() => setErrorMessage(null), 8000);
     } finally {
       setIsSpeaking(false);
       isSpeakingRef.current = false;

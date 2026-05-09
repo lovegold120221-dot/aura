@@ -96,9 +96,13 @@ export async function speakTranslation(text: string, emotion: string = "Neutral"
               }, Math.max(0, waitTime + 100));
             }
           },
-          onerror: (err) => {
+          onerror: (err: any) => {
             console.error("Live API Error:", err);
-            reject(err);
+            if (err?.message?.includes("quota") || err?.status === 429 || err?.message?.includes("exceeded")) {
+              reject(new Error("You exceeded your current quota for translation audio. Please check your billing details."));
+            } else {
+              reject(err);
+            }
           }
         }
       });
@@ -106,8 +110,12 @@ export async function speakTranslation(text: string, emotion: string = "Neutral"
       session.sendClientContent({
         turns: [text]
       });
-    } catch (err) {
-      reject(err);
+    } catch (err: any) {
+      if (err?.message?.includes("quota") || err?.status === 429 || err?.message?.includes("exceeded")) {
+        reject(new Error("You exceeded your current quota for translation audio. Please check your billing details."));
+      } else {
+        reject(err);
+      }
     }
   });
 }
@@ -125,6 +133,8 @@ export interface VoiceAnalysis {
 // 1. Every non-Flemish language -> Translated to Dutch Flemish.
 // 2. Every Dutch Flemish language -> Translated back to the last detected non-Flemish language (fallback: English).
 
+import { langMap } from '../langMap';
+
 export async function analyzeText(
   transcriptText: string, 
   targetLanguage: string = "Multilingual", 
@@ -132,42 +142,40 @@ export async function analyzeText(
   onChunk?: (partial: Partial<VoiceAnalysis>) => void
 ): Promise<VoiceAnalysis> {
   try {
-    const model = "gemini-3.1-flash-lite";
-
-    const prompt = `You are a strict translation engine. Obey these rules exactly.
-1. Detect the language of the source text.
-2. Detect the primary emotion of the text in one word (e.g., Happy, Sad, Angry, Neutral, Excited).
-3. If the detected language is Dutch/Flemish (Vlaams, Nederlands):
-   - Translate the text to: ${targetLanguage !== 'Multilingual' ? targetLanguage : fallbackLanguage}.
-4. If the detected language is NOT Dutch/Flemish:
-   - Translate the text to: Dutch Flemish.
-   
-Respond ONLY with a valid JSON object matching this schema, no markdown blocks:
-{
-  "translation": "Translated text string",
-  "detectedLanguage": "The name of the language detected (e.g., English, Spanish, Dutch Flemish)",
-  "emotion": "Single word emotion"
-}
-
-Source text: "${transcriptText}"`;
-
-    const res = await ai.models.generateContent({
-      model,
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      config: {
-        responseMimeType: "application/json",
-        temperature: 0.1,
-      }
-    });
-
-    const resultText = res.text?.trim() || "{}";
-    const data = JSON.parse(resultText);
+    const fallbackCode = langMap[fallbackLanguage] || 'en';
+    const targetCode = targetLanguage !== 'Multilingual' ? (langMap[targetLanguage] || fallbackCode) : fallbackCode;
     
+    // First translate to Dutch (nl)
+    let url = `https://translate.googleapis.com/translate_a/single?client=gtx&dt=t&sl=auto&tl=nl&q=${encodeURIComponent(transcriptText)}`;
+    let res = await fetch(url);
+    if (!res.ok) throw new Error(`Translate API error: ${res.statusText}`);
+    let data = await res.json();
+    
+    let sourceLangCode = data[2];
+    let translation = data[0].map((x: any) => x[0]).join('');
+    
+    const isDutch = sourceLangCode === 'nl' || sourceLangCode?.startsWith('nl');
+    
+    // If the original text was Dutch, translate to the target language instead
+    if (isDutch) {
+      url = `https://translate.googleapis.com/translate_a/single?client=gtx&dt=t&sl=nl&tl=${targetCode}&q=${encodeURIComponent(transcriptText)}`;
+      res = await fetch(url);
+      if (!res.ok) throw new Error(`Translate API error: ${res.statusText}`);
+      data = await res.json();
+      translation = data[0].map((x: any) => x[0]).join('');
+    }
+    
+    let languageName = sourceLangCode;
+    try {
+      const displayNames = new Intl.DisplayNames(['en'], { type: 'language' });
+      languageName = displayNames.of(sourceLangCode) || sourceLangCode;
+    } catch(e) {}
+
     const analysis = {
       transcript: transcriptText,
-      translation: data.translation || "Translation Error",
-      language: data.detectedLanguage || "Unknown",
-      emotion: data.emotion || "Neutral",
+      translation: translation,
+      language: languageName,
+      emotion: "Neutral",
       confidence: 99
     };
     
@@ -181,7 +189,7 @@ Source text: "${transcriptText}"`;
     }
 
     return analysis;
-  } catch (e) {
+  } catch (e: any) {
     console.error("Failed to parse analysis:", e);
     return {
       transcript: transcriptText,
