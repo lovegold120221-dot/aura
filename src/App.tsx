@@ -39,7 +39,7 @@ export default function App() {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const isSpeakingRef = useRef(false);
-  const [isMuted, setIsMuted] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
   const [currentEmotion, setCurrentEmotion] = useState<string | null>(null);
@@ -200,7 +200,7 @@ export default function App() {
             }
 
             if (analysis.translation && !isMuted) {
-              await playTranslation(analysis.translation, analysis.emotion);
+              await playTranslation(analysis.translation, analysis.language);
             }
           } catch (err: any) {
             console.error(err);
@@ -257,13 +257,13 @@ export default function App() {
     }
   };
 
-  const playTranslation = async (text: string, emotion?: string) => {
+  const playTranslation = async (text: string, languageName: string = "English") => {
     if (isSpeakingRef.current) return;
     setIsSpeaking(true);
     isSpeakingRef.current = true;
     setDeepgramMuted(true);
     try {
-      await speakTranslation(text, emotion);
+      await speakTranslation(text, languageName);
     } catch (err: any) {
       console.error(err);
       if (err?.message?.includes("quota") || err?.status === 429 || err?.message?.includes("exceeded")) {
@@ -557,7 +557,7 @@ export default function App() {
                          <div className="flex items-center gap-2">
                            {lastInteraction.translation && lastInteraction.translation !== 'Translating...' && (
                              <button
-                               onClick={() => playTranslation(lastInteraction.translation!, lastInteraction.emotion)}
+                               onClick={() => playTranslation(lastInteraction.translation!, lastInteraction.language!)}
                                className={`p-1.5 rounded-full transition-colors ${isSpeaking ? 'animate-pulse text-emerald-400' : (isDark ? 'hover:bg-blue-500/20 text-blue-400/80' : 'hover:bg-blue-200 text-blue-600/80')}`}
                                title="Read Translation"
                              >
@@ -701,7 +701,7 @@ export default function App() {
                              <div className="flex items-start gap-2">
                                <p className={`flex-1 text-lg leading-relaxed italic ${isDark ? 'text-blue-400/80' : 'text-blue-700/80'}`}>{item.translation}</p>
                                <button
-                                 onClick={() => playTranslation(item.translation!, item.emotion)}
+                                 onClick={() => playTranslation(item.translation!, item.language || "English")}
                                  className={`p-1.5 mt-1 rounded-full shrink-0 transition-colors ${isDark ? 'hover:bg-blue-500/20 text-blue-400/80' : 'hover:bg-blue-200 text-blue-600/80'}`}
                                  title="Read Translation"
                                >

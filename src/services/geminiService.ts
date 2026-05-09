@@ -1,122 +1,36 @@
-import { GoogleGenAI, Modality, Type, MediaResolution, LiveServerMessage } from "@google/genai";
+import { langMap } from '../langMap';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
-// WAV Header creation adapted for browser (Uint8Array)
-function createWavHeader(dataLength: number, sampleRate: number = 24000) {
-  const buffer = new ArrayBuffer(44);
-  const view = new DataView(buffer);
-  
-  const writeString = (offset: number, string: string) => {
-    for (let i = 0; i < string.length; i++) {
-      view.setUint8(offset + i, string.charCodeAt(i));
+export async function speakTranslation(text: string, languageName: string = "English") {
+  return new Promise<void>((resolve, reject) => {
+    if (!('speechSynthesis' in window)) {
+      return reject(new Error('Text-to-speech is not supported in this browser.'));
     }
-  };
 
-  writeString(0, 'RIFF');
-  view.setUint32(4, 36 + dataLength, true);
-  writeString(8, 'WAVE');
-  writeString(12, 'fmt ');
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true); // PCM
-  view.setUint16(22, 1, true); // Mono
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * 2, true); // ByteRate
-  view.setUint16(32, 2, true); // BlockAlign
-  view.setUint16(34, 16, true); // BitsPerSample
-  writeString(36, 'data');
-  view.setUint32(40, dataLength, true);
+    const langCode = langMap[languageName] || 'en';
 
-  return new Uint8Array(buffer);
-}
+    window.speechSynthesis.cancel(); // Cancel any ongoing speech
 
-export async function speakTranslation(text: string, emotion: string = "Neutral") {
-  const model = 'gemini-3.1-flash-live-preview';
-  
-  const config = {
-    responseModalities: [Modality.AUDIO],
-    mediaResolution: MediaResolution.MEDIA_RESOLUTION_MEDIUM,
-    speechConfig: {
-      voiceConfig: {
-        prebuiltVoiceConfig: { voiceName: 'Orus' }
-      }
-    },
-    systemInstruction: {
-      parts: [{
-        text: `You are a Reader, Read Aloud ONLY the users text input in a high human nuance. You dont add Intro or extro. You are not conversational. You are just A READER ENGINE. Read Aloud the input of the user tailored to the language. Base your tone on the emotion: ${emotion}.`,
-      }]
-    },
-  };
-
-  const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-  let nextStartTime = audioContext.currentTime;
-
-  return new Promise<void>(async (resolve, reject) => {
-    try {
-      const session = await ai.live.connect({
-        model,
-        config,
-        callbacks: {
-          onmessage: async (message: LiveServerMessage) => {
-            const parts = message.serverContent?.modelTurn?.parts;
-            if (parts) {
-              const part = parts[0];
-              if (part?.inlineData) {
-                // PCM 16-bit Mono 24kHz
-                const binary = atob(part.inlineData.data);
-                const bytes = new Uint8Array(binary.length);
-                for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-                
-                const int16Buffer = new Int16Array(bytes.buffer);
-                const float32Buffer = new Float32Array(int16Buffer.length);
-                for (let i = 0; i < int16Buffer.length; i++) {
-                  float32Buffer[i] = int16Buffer[i] / 32768.0;
-                }
-
-                const audioBuffer = audioContext.createBuffer(1, float32Buffer.length, 24000);
-                audioBuffer.getChannelData(0).set(float32Buffer);
-
-                const source = audioContext.createBufferSource();
-                source.buffer = audioBuffer;
-                source.connect(audioContext.destination);
-                
-                const start = Math.max(nextStartTime, audioContext.currentTime);
-                source.start(start);
-                nextStartTime = start + audioBuffer.duration;
-              }
-            }
-
-            if (message.serverContent?.turnComplete) {
-              // Wait for the scheduled audio to finish
-              const waitTime = (nextStartTime - audioContext.currentTime) * 1000;
-              setTimeout(() => {
-                session.close();
-                audioContext.close();
-                resolve();
-              }, Math.max(0, waitTime + 100));
-            }
-          },
-          onerror: (err: any) => {
-            console.error("Live API Error:", err);
-            if (err?.message?.includes("quota") || err?.status === 429 || err?.message?.includes("exceeded")) {
-              reject(new Error("You exceeded your current quota for translation audio. Please check your billing details."));
-            } else {
-              reject(err);
-            }
-          }
-        }
-      });
-
-      session.sendClientContent({
-        turns: [text]
-      });
-    } catch (err: any) {
-      if (err?.message?.includes("quota") || err?.status === 429 || err?.message?.includes("exceeded")) {
-        reject(new Error("You exceeded your current quota for translation audio. Please check your billing details."));
-      } else {
-        reject(err);
-      }
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = langCode;
+    utterance.rate = 1.0;
+    
+    // Attempt to set a matching voice if available
+    const voices = window.speechSynthesis.getVoices();
+    const voice = voices.find(v => v.lang.startsWith(langCode));
+    if (voice) {
+      utterance.voice = voice;
     }
+
+    utterance.onend = () => {
+      resolve();
+    };
+
+    utterance.onerror = (e) => {
+      console.error('Speech synthesis error:', e);
+      resolve(); // resolve so it doesn't block the UI
+    };
+
+    window.speechSynthesis.speak(utterance);
   });
 }
 
@@ -132,8 +46,6 @@ export interface VoiceAnalysis {
 // Logic: 
 // 1. Every non-Flemish language -> Translated to Dutch Flemish.
 // 2. Every Dutch Flemish language -> Translated back to the last detected non-Flemish language (fallback: English).
-
-import { langMap } from '../langMap';
 
 export async function analyzeText(
   transcriptText: string, 
