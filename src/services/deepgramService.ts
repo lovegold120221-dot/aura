@@ -17,8 +17,8 @@ export const startDeepgramTranscription = async (
     const deepgram = new DeepgramClient({ apiKey: DEEPGRAM_API_KEY });
 
     connection = await deepgram.listen.v1.connect({
-      model: 'nova-2',
-      detect_language: true,
+      model: 'nova-3',
+      language: 'multi',
       smart_format: true,
       interim_results: true,
       utterance_end_ms: 2000,

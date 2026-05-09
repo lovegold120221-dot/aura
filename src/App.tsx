@@ -176,12 +176,13 @@ export default function App() {
               timestamp: Date.now(),
               type: 'user',
               text: analysis.transcript,
-              translation: analysis.translation,
-              language: analysis.language,
-              emotion: analysis.emotion,
-              words: words,
-              detectedLanguage: detectedLanguage
             };
+            
+            if (analysis.translation) userInteraction.translation = analysis.translation;
+            if (analysis.language) userInteraction.language = analysis.language;
+            if (analysis.emotion) userInteraction.emotion = analysis.emotion;
+            if (words) userInteraction.words = words;
+            if (detectedLanguage) userInteraction.detectedLanguage = detectedLanguage;
             
             if (user) {
               const historyRef = ref(rtdb, `users/${user.uid}/history/${userInteraction.id}`);
