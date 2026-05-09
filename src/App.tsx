@@ -205,7 +205,7 @@ export default function App() {
           } catch (err: any) {
             console.error(err);
             if (err?.message?.includes("quota") || err?.status === 429 || err?.message?.includes("exceeded")) {
-              setErrorMessage("You exceeded your current quota for translation. Please check your billing details.");
+              setErrorMessage("Server is Down.");
             } else {
               setErrorMessage(err.message || String(err));
             }
@@ -267,7 +267,7 @@ export default function App() {
     } catch (err: any) {
       console.error(err);
       if (err?.message?.includes("quota") || err?.status === 429 || err?.message?.includes("exceeded")) {
-        setErrorMessage("You exceeded your current quota for translation audio. Please check your billing details.");
+        setErrorMessage("Server is Down.");
       } else {
         setErrorMessage(err.message || String(err));
       }
