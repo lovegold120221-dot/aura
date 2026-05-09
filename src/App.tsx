@@ -50,6 +50,7 @@ export default function App() {
   
   const [isDark, setIsDark] = useState(true);
   const [showProfile, setShowProfile] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const exportHistory = () => {
     if (interactions.length === 0) return;
@@ -204,8 +205,10 @@ export default function App() {
             if (analysis.translation && !isMuted) {
               await playTranslation(analysis.translation, analysis.emotion);
             }
-          } catch (err) {
+          } catch (err: any) {
             console.error(err);
+            setErrorMessage(err.message || String(err));
+            setTimeout(() => setErrorMessage(null), 8000);
             setStreamingInteraction(null);
           } finally {
             setIsProcessing(false);
@@ -383,6 +386,28 @@ export default function App() {
                 Sign Out
               </button>
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {errorMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, x: '-50%' }}
+            animate={{ opacity: 1, y: 0, x: '-50%' }}
+            exit={{ opacity: 0, y: -20, x: '-50%' }}
+            className={`fixed top-4 left-1/2 z-50 px-4 py-3 rounded-lg shadow-xl shadow-red-500/10 border flex items-start gap-3 max-w-sm w-[90%] sm:w-auto ${isDark ? 'bg-red-500/10 border-red-500/20 text-red-200' : 'bg-red-50 border-red-200 text-red-800'}`}
+          >
+            <ShieldCheck className="w-5 h-5 shrink-0 text-red-500 mt-0.5" />
+            <div className="flex-1 text-sm font-medium leading-relaxed">
+              {errorMessage}
+            </div>
+            <button 
+              onClick={() => setErrorMessage(null)}
+              className={`p-1 rounded-full hover:bg-black/5 opacity-70 hover:opacity-100 transition-all ${isDark ? 'hover:bg-white/5' : ''}`}
+            >
+              <VolumeX className="w-4 h-4" />
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
