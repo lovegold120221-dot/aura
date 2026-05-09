@@ -45,7 +45,7 @@ export const startDeepgramTranscription = async (
       });
 
       mediaRecorder.addEventListener('dataavailable', async (event) => {
-        if (event.data.size > 0 && connection.socket?.readyState === 1) {
+        if (event.data.size > 0 && connection && connection.socket?.readyState === 1) {
           connection.socket.send(event.data);
         }
       });
