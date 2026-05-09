@@ -39,20 +39,4 @@ body {
   backdrop-filter: blur(10px);
 }
 
-.input-label {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: #64748b;
-  margin-bottom: 8px;
-}
 
-.translation-label {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: #4ade80;
-  margin-bottom: 8px;
-}

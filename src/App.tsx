@@ -261,7 +261,7 @@ export default function App() {
               <div className="space-y-1">
                 <span className="text-[10px] uppercase font-bold text-gray-600 tracking-wider">VAD State</span>
                 <div className={`text-sm font-mono font-bold flex items-center gap-2 ${isListening ? 'text-emerald-400' : 'text-gray-500'}`}>
-                  <div className={`w-2 h-2 rounded-full ${isListening ? 'bg-emerald-400 animate-pulse' : 'bg-gray-700'}`} />
+                  <div className={`w-2 h-2 rounded-full ${isListening ? 'bg-emerald-400 animate-pulse' : (isDark ? 'bg-gray-700' : 'bg-gray-300')}`} />
                   {isListening ? 'ACTIVE' : 'IDLE'}
                 </div>
               </div>
@@ -317,8 +317,8 @@ export default function App() {
       <div className="flex-1 flex flex-col h-full relative">
         {/* Header */}
         <header className={`h-16 px-4 sm:px-6 flex justify-between items-center border-b ${isDark ? 'border-white/5 bg-[#1a1c1e]' : 'border-gray-200 bg-white'} z-10 shrink-0 transition-colors duration-300`}>
-          <div className={`hidden sm:flex p-2 rounded-lg ${isDark ? 'bg-[#2d3034] border-white/10' : 'bg-gray-100 border-gray-200'} border`}>
-             <Zap className="w-5 h-5 text-gray-200 fill-current opacity-70" />
+          <div className={`hidden sm:flex p-2 rounded-lg ${isDark ? 'bg-[#2d3034] border-white/10' : 'bg-gray-100 border-gray-200'} border transition-colors duration-300`}>
+             <Zap className={`w-5 h-5 fill-current ${isDark ? 'text-gray-200 opacity-70' : 'text-emerald-500 opacity-90'}`} />
           </div>
           
           {/* Audio Visualizer - Header Center */}
@@ -333,7 +333,7 @@ export default function App() {
                 className={`w-[2px] rounded-full transition-colors duration-300 ${
                   isListening ? 'bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 
                   isProcessing ? 'bg-blue-400' : 
-                  'bg-gray-700'
+                  (isDark ? 'bg-gray-700' : 'bg-gray-300')
                 }`}
               />
             ))}
@@ -351,13 +351,13 @@ export default function App() {
             </select>
             <button 
               onClick={() => setShowSidebar(true)}
-              className="p-1.5 sm:p-2 text-gray-400 hover:text-white transition-colors"
+              className={`p-1.5 sm:p-2 text-gray-400 transition-colors ${isDark ? 'hover:text-white' : 'hover:text-gray-900'}`}
             >
               <PanelRightOpen className="w-5 h-5" />
             </button>
             <button 
               onClick={() => setIsDark(!isDark)}
-              className="hidden sm:block p-1.5 sm:p-2 text-gray-400 hover:text-white transition-colors"
+              className={`hidden sm:block p-1.5 sm:p-2 text-gray-400 transition-colors ${isDark ? 'hover:text-white' : 'hover:text-gray-900'}`}
             >
               {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>
@@ -369,8 +369,8 @@ export default function App() {
            <div className="w-full max-w-2xl space-y-8 sm:space-y-12">
               {/* Transcription Area */}
               <div className="space-y-2 sm:space-y-3">
-                <h3 className="input-label ml-2 sm:ml-0">Transcription</h3>
-                <div className="w-full min-h-[150px] sm:min-h-[180px] p-6 sm:p-8 rounded-[32px] sm:rounded-[40px] border border-emerald-500/10 bg-emerald-500/[0.02] dark-container flex flex-col gap-4 sm:gap-6">
+                <h3 className={`text-[10px] font-bold tracking-widest uppercase mb-2 ml-2 sm:ml-0 ${isDark ? 'text-emerald-500' : 'text-emerald-700'}`}>Transcription</h3>
+                <div className={`w-full min-h-[150px] sm:min-h-[180px] p-6 sm:p-8 rounded-[32px] sm:rounded-[40px] border flex flex-col gap-4 sm:gap-6 backdrop-blur-md transition-colors duration-300 ${isDark ? 'border-emerald-500/10 bg-emerald-500/[0.02] bg-[#1e2023]/60 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)] text-gray-200' : 'border-emerald-500/30 bg-emerald-50 text-gray-900 shadow-sm'}`}>
                    {isListening ? (
                      <div className="flex-1 flex items-center">
                        <span className="flex items-center gap-3 text-emerald-400 text-xl sm:text-2xl font-medium">
@@ -380,7 +380,7 @@ export default function App() {
                      </div>
                    ) : isProcessing ? (
                      <div className="flex-1 flex items-center">
-                       <span className="italic opacity-50 flex items-center gap-2 text-xl sm:text-2xl font-medium text-gray-400">
+                       <span className={`italic flex items-center gap-2 text-xl sm:text-2xl font-medium ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
                           <Cpu className="w-5 h-5 sm:w-6 sm:h-6 animate-spin" />
                           Syncing Neural Bridge...
                        </span>
@@ -389,24 +389,24 @@ export default function App() {
                      <>
                        <div className="flex justify-between items-center">
                          <div className="flex gap-2">
-                           <span className="text-[10px] font-mono font-bold px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-wider hidden sm:block">
+                           <span className={`text-[10px] font-mono font-bold px-2 py-1 rounded uppercase tracking-wider hidden sm:block ${isDark ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-emerald-100 text-emerald-700 border border-emerald-200'}`}>
                              {lastInteraction.language || 'Detecting'}
                            </span>
-                           <span className="text-[10px] font-mono font-bold px-2 py-1 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 uppercase tracking-wider">
+                           <span className={`text-[10px] font-mono font-bold px-2 py-1 rounded uppercase tracking-wider ${isDark ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-amber-100 text-amber-700 border border-amber-200'}`}>
                              {lastInteraction.emotion || 'Neutral'}
                            </span>
                          </div>
-                         <span className="text-[9px] sm:text-[10px] text-emerald-400/50 font-mono tracking-widest uppercase font-bold text-right">
+                         <span className={`text-[9px] sm:text-[10px] font-mono tracking-widest uppercase font-bold text-right ${isDark ? 'text-emerald-400/50' : 'text-emerald-600/70'}`}>
                            Source Input
                          </span>
                        </div>
-                       <p className="text-xl sm:text-2xl font-medium text-gray-300 leading-relaxed">
+                       <p className={`text-xl sm:text-2xl font-medium leading-relaxed ${isDark ? 'text-gray-300' : 'text-gray-900'}`}>
                          {lastInteraction.text}
                        </p>
                      </>
                    ) : (
                      <div className="flex-1 flex items-center justify-center">
-                        <span className="opacity-10 italic text-lg sm:text-xl">Awaiting pulse...</span>
+                        <span className={`italic text-lg sm:text-xl font-medium ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>Awaiting pulse...</span>
                      </div>
                    )}
                 </div>
@@ -414,26 +414,26 @@ export default function App() {
 
               {/* Translation Area */}
               <div className="space-y-2 sm:space-y-3">
-                <h3 className="translation-label text-blue-400 ml-2 sm:ml-0">
+                <h3 className={`text-[10px] font-bold tracking-widest uppercase mb-2 ml-2 sm:ml-0 ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>
                   Translation {lastInteraction?.language && isDutchFlemish(lastInteraction.language) ? `(${targetLanguage === 'Multilingual' ? (lastNonTargetLanguage || 'English') : targetLanguage})` : `(Dutch Flemish)`}
                 </h3>
-                <div className="w-full min-h-[150px] sm:min-h-[180px] p-6 sm:p-8 rounded-[32px] sm:rounded-[40px] border border-blue-400/10 bg-blue-400/[0.02] dark-container flex flex-col gap-4 sm:gap-6">
+                <div className={`w-full min-h-[150px] sm:min-h-[180px] p-6 sm:p-8 rounded-[32px] sm:rounded-[40px] border flex flex-col gap-4 sm:gap-6 backdrop-blur-md transition-colors duration-300 ${isDark ? 'border-blue-400/10 bg-blue-400/[0.02] bg-[#1e2023]/60 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)] text-blue-100' : 'border-blue-400/30 bg-blue-50 text-blue-900 shadow-sm'}`}>
                    {lastInteraction ? (
                      <>
                        <div className="flex justify-between items-center">
                          <div className="flex gap-2">
-                           <span className="text-[10px] font-mono font-bold px-2 py-1 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 uppercase tracking-wider hidden sm:block">
+                           <span className={`text-[10px] font-mono font-bold px-2 py-1 rounded uppercase tracking-wider hidden sm:block ${isDark ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'bg-blue-100 text-blue-700 border border-blue-200'}`}>
                              {lastInteraction.language && isDutchFlemish(lastInteraction.language) ? (targetLanguage === 'Multilingual' ? (lastNonTargetLanguage || 'English') : targetLanguage) : 'Dutch Flemish'}
                            </span>
-                           <span className="text-[10px] font-mono font-bold px-2 py-1 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 uppercase tracking-wider">
+                           <span className={`text-[10px] font-mono font-bold px-2 py-1 rounded uppercase tracking-wider ${isDark ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-amber-100 text-amber-700 border border-amber-200'}`}>
                              {lastInteraction.emotion || 'Neutral'}
                            </span>
                          </div>
-                         <span className="text-[9px] sm:text-[10px] text-blue-400/50 font-mono tracking-widest uppercase font-bold text-right">
+                         <span className={`text-[9px] sm:text-[10px] font-mono tracking-widest uppercase font-bold text-right ${isDark ? 'text-blue-400/50' : 'text-blue-600/70'}`}>
                            Neural Output
                          </span>
                        </div>
-                       <p className="text-xl sm:text-2xl font-medium text-blue-100 leading-relaxed">
+                       <p className={`text-xl sm:text-2xl font-medium leading-relaxed ${isDark ? 'text-blue-100' : 'text-blue-900'}`}>
                          {lastInteraction.translation === 'Translating...' ? (
                            <span className="flex items-center gap-2 text-blue-400">
                              Translating
@@ -450,7 +450,7 @@ export default function App() {
                      </>
                    ) : (
                      <div className="flex-1 flex items-center justify-center">
-                        <span className="opacity-10 italic text-lg sm:text-xl">Translation bridge idle</span>
+                        <span className={`italic text-lg sm:text-xl font-medium ${isDark ? 'text-blue-500/30' : 'text-blue-400/50'}`}>Translation bridge idle</span>
                      </div>
                    )}
                 </div>
@@ -463,13 +463,13 @@ export default function App() {
           <div className={`flex items-center gap-2 sm:gap-6 px-4 sm:px-6 py-3 sm:py-4 rounded-[24px] sm:rounded-[32px] ${isDark ? 'bg-[#2d3034] border-white/5' : 'bg-white border-gray-200 overflow-hidden shadow-xl'} border shadow-2xl transition-colors duration-300`}>
              <button 
                onClick={handleToggleSession}
-               className={`p-2.5 sm:p-3 rounded-full transition-all active:scale-95 ${isListening ? 'bg-red-500/10 text-red-400' : 'text-gray-400 hover:text-white'}`}
+               className={`p-2.5 sm:p-3 rounded-full transition-all active:scale-95 ${isListening ? 'bg-red-500/10 text-red-400' : `text-gray-400 ${isDark ? 'hover:text-white' : 'hover:text-gray-900'}`}`}
              >
                {isListening ? <Mic className="w-5 h-5 sm:w-6 sm:h-6 animate-pulse" /> : <MicOff className="w-5 h-5 sm:w-6 sm:h-6" />}
              </button>
              <button 
                onClick={() => setIsMuted(!isMuted)}
-               className={`p-2.5 sm:p-3 rounded-full transition-all active:scale-95 ${isMuted ? 'bg-gray-500/10 text-gray-500' : 'text-blue-400 hover:text-white'}`}
+               className={`p-2.5 sm:p-3 rounded-full transition-all active:scale-95 ${isMuted ? 'bg-gray-500/10 text-gray-500' : `text-blue-400 ${isDark ? 'hover:text-white' : 'hover:text-gray-900'}`}`}
              >
                {isMuted ? <VolumeX className="w-5 h-5 sm:w-6 sm:h-6" /> : <Volume2 className="w-5 h-5 sm:w-6 sm:h-6" />}
              </button>
@@ -481,7 +481,7 @@ export default function App() {
                    remove(ref(rtdb, `users/${user.uid}/history`));
                  }
                }}
-               className="p-2.5 sm:p-3 text-gray-400 hover:text-white transition-colors"
+               className={`p-2.5 sm:p-3 text-gray-400 transition-colors ${isDark ? 'hover:text-white' : 'hover:text-gray-900'}`}
              >
                <RotateCcw className="w-5 h-5 sm:w-6 sm:h-6" />
              </button>
@@ -540,10 +540,10 @@ export default function App() {
                     <div key={item.id} className={`p-8 rounded-[32px] ${isDark ? 'bg-[#1a1c1e] border-white/5' : 'bg-white border-gray-200 shadow-sm'} border space-y-4 transition-colors duration-300`}>
                         <div className="flex justify-between items-center">
                            <div className="flex gap-2">
-                             <span className="text-[10px] font-mono font-bold px-2 py-1 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 uppercase">
+                             <span className={`text-[10px] font-mono font-bold px-2 py-1 rounded uppercase ${isDark ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'bg-blue-100 text-blue-700 border border-blue-200'}`}>
                                {item.language || 'N/A'}
                              </span>
-                             <span className="text-[10px] font-mono font-bold px-2 py-1 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 uppercase">
+                             <span className={`text-[10px] font-mono font-bold px-2 py-1 rounded uppercase ${isDark ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-amber-100 text-amber-700 border border-amber-200'}`}>
                                {item.emotion || 'NEUTRAL'}
                              </span>
                            </div>
@@ -552,9 +552,9 @@ export default function App() {
                            </span>
                         </div>
                         <div className="space-y-2">
-                           <p className="text-xl leading-relaxed text-gray-200">{item.text}</p>
+                           <p className={`text-xl leading-relaxed ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>{item.text}</p>
                            {item.translation && (
-                             <p className="text-lg leading-relaxed text-blue-400/80 italic">{item.translation}</p>
+                             <p className={`text-lg leading-relaxed italic ${isDark ? 'text-blue-400/80' : 'text-blue-700/80'}`}>{item.translation}</p>
                            )}
                         </div>
                     </div>
