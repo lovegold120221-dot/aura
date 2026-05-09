@@ -22,7 +22,7 @@ export const startDeepgramTranscription = async (
       smart_format: true,
       interim_results: true,
       utterance_end_ms: 2000,
-      endpointing: 500,
+      endpointing: 2000,
       vad_events: true,
       numerals: true,
     } as any);
