@@ -7,7 +7,7 @@ import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Mic, MicOff, History, Cpu, Zap, Activity, ShieldCheck, Settings, Play, Volume2, VolumeX, RotateCcw, PanelRightClose, PanelRightOpen, Languages, Ghost, Square, LogOut, Sun, Moon, User as UserIcon, Mail, Download } from 'lucide-react';
 import { analyzeText, speakTranslation } from './services/geminiService';
-import { startDeepgramTranscription, stopDeepgramTranscription } from './services/deepgramService';
+import { startDeepgramTranscription, stopDeepgramTranscription, setDeepgramMuted } from './services/deepgramService';
 import { auth, rtdb } from './services/firebase';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { ref, onValue, set, push, remove } from 'firebase/database';
@@ -35,8 +35,10 @@ export default function App() {
   const [interactions, setInteractions] = useState<Interaction[]>([]);
   const [streamingInteraction, setStreamingInteraction] = useState<Partial<Interaction> | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const isProcessingRef = useRef(false);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const isSpeakingRef = useRef(false);
   const [isMuted, setIsMuted] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
@@ -140,6 +142,7 @@ export default function App() {
           }));
         } else {
           // Received final transcript utterance
+          setDeepgramMuted(true);
           setStreamingInteraction({ 
             id: Date.now().toString(),
             timestamp: Date.now(),
@@ -150,6 +153,7 @@ export default function App() {
             detectedLanguage: detectedLanguage
           });
           setIsProcessing(true);
+          isProcessingRef.current = true;
           
           try {
             const analysis = await analyzeText(
@@ -197,15 +201,19 @@ export default function App() {
             }
 
             if (analysis.translation && !isMuted) {
-              setIsSpeaking(true);
-              await speakTranslation(analysis.translation, analysis.emotion);
-              setIsSpeaking(false);
+              await playTranslation(analysis.translation, analysis.emotion);
             }
           } catch (err) {
             console.error(err);
             setStreamingInteraction(null);
           } finally {
             setIsProcessing(false);
+            isProcessingRef.current = false;
+            // playTranslation manages its own unmuting if it was called and is still speaking,
+            // but we need to ensure unmuting if it wasn't called or failed.
+            if (!isSpeakingRef.current) {
+              setDeepgramMuted(false);
+            }
           }
         }
       },
@@ -241,6 +249,22 @@ export default function App() {
       handleDeepgramStart();
     } else {
       handleDeepgramStop();
+    }
+  };
+
+  const playTranslation = async (text: string, emotion?: string) => {
+    if (isSpeakingRef.current) return;
+    setIsSpeaking(true);
+    isSpeakingRef.current = true;
+    setDeepgramMuted(true);
+    try {
+      await speakTranslation(text, emotion);
+    } finally {
+      setIsSpeaking(false);
+      isSpeakingRef.current = false;
+      if (!isProcessingRef.current) {
+        setDeepgramMuted(false);
+      }
     }
   };
 
@@ -498,7 +522,7 @@ export default function App() {
                          <div className="flex items-center gap-2">
                            {lastInteraction.translation && lastInteraction.translation !== 'Translating...' && (
                              <button
-                               onClick={() => speakTranslation(lastInteraction.translation!, lastInteraction.emotion)}
+                               onClick={() => playTranslation(lastInteraction.translation!, lastInteraction.emotion)}
                                className={`p-1.5 rounded-full transition-colors ${isSpeaking ? 'animate-pulse text-emerald-400' : (isDark ? 'hover:bg-blue-500/20 text-blue-400/80' : 'hover:bg-blue-200 text-blue-600/80')}`}
                                title="Read Translation"
                              >
@@ -642,7 +666,7 @@ export default function App() {
                              <div className="flex items-start gap-2">
                                <p className={`flex-1 text-lg leading-relaxed italic ${isDark ? 'text-blue-400/80' : 'text-blue-700/80'}`}>{item.translation}</p>
                                <button
-                                 onClick={() => speakTranslation(item.translation!, item.emotion)}
+                                 onClick={() => playTranslation(item.translation!, item.emotion)}
                                  className={`p-1.5 mt-1 rounded-full shrink-0 transition-colors ${isDark ? 'hover:bg-blue-500/20 text-blue-400/80' : 'hover:bg-blue-200 text-blue-600/80'}`}
                                  title="Read Translation"
                                >

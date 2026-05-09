@@ -17,7 +17,7 @@ export const startDeepgramTranscription = async (
     const deepgram = new DeepgramClient({ apiKey: DEEPGRAM_API_KEY });
 
     connection = await deepgram.listen.v1.connect({
-      model: 'nova-3',
+      model: 'nova-2',
       detect_language: true,
       smart_format: true,
       interim_results: true,
@@ -117,6 +117,14 @@ export const startDeepgramTranscription = async (
   } catch (err) {
     console.error('Failed to start Deepgram:', err);
     onError(err);
+  }
+};
+
+export const setDeepgramMuted = (muted: boolean) => {
+  if (stream) {
+    stream.getAudioTracks().forEach(track => {
+      track.enabled = !muted;
+    });
   }
 };
 
