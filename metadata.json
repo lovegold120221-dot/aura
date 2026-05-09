@@ -1,0 +1,12 @@
+{
+  "name": "Remix: VoxAura: Emotional Voice Intelligence",
+  "description": "Mobile-first voice assistant with automatic language detection, high-accuracy STT, and emotion-aware synthesis.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "AI-powered audio processing",
+    "Real-time voice activity detection",
+    "Multi-language support"
+  ]
+}
