@@ -124,78 +124,63 @@ export interface VoiceAnalysis {
 // Logic: 
 // 1. Every non-Flemish language -> Translated to Dutch Flemish.
 // 2. Every Dutch Flemish language -> Translated back to the last detected non-Flemish language (fallback: English).
-const langMap: Record<string, string> = {
-  "Dutch Flemish": "nl",
-  "English": "en",
-  "Spanish": "es",
-  "French": "fr",
-  "German": "de",
-  "Japanese": "ja"
-};
-
-async function getGoogleTranslate(text: string, to: string) {
-  const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${to}&dt=t&q=${encodeURIComponent(text)}`;
-  const res = await fetch(url);
-  const data = await res.json();
-  const translation = data[0].map((item: any) => item[0]).join("");
-  const detectedLang = data[2]; // e.g., 'en', 'nl'
-  return { translation, detectedLang };
-}
 
 export async function analyzeText(
   transcriptText: string, 
-  targetLanguage: string = "Dutch Flemish", 
+  targetLanguage: string = "Multilingual", 
   fallbackLanguage: string = "English",
   onChunk?: (partial: Partial<VoiceAnalysis>) => void
 ): Promise<VoiceAnalysis> {
   try {
-    // Start Google Translate
-    let toCode = langMap[targetLanguage] || "nl";
-    let transRes = await getGoogleTranslate(transcriptText, toCode);
-    
-    // If it detected the target language (e.g. Dutch), we reverse translate to fallback
-    if (transRes.detectedLang === toCode || (toCode === 'nl' && transRes.detectedLang === 'nl')) {
-      const fallbackCode = langMap[fallbackLanguage] || "en";
-      transRes = await getGoogleTranslate(transcriptText, fallbackCode);
-    }
-    
-    if (onChunk) {
-      onChunk({
-        transcript: transcriptText,
-        translation: transRes.translation,
-        language: transRes.detectedLang
-      });
-    }
-
-    // Now get the emotion from Gemini very quickly
     const model = "gemini-3.1-flash-lite";
-    const emotionRes = await ai.models.generateContent({
-      model,
-      contents: [
-        { role: "user", parts: [{ text: `Detect the primary emotion of this text in one word (e.g., Happy, Sad, Angry, Neutral, Excited).\nText: "${transcriptText}"` }] }
-      ]
-    });
-    
-    const emotion = emotionRes.text?.trim() || "Neutral";
-    
-    if (onChunk) {
-      onChunk({
-        emotion
-      });
-    }
 
-    return {
+    const prompt = `You are a strict translation engine. Obey these rules exactly.
+1. Detect the language of the source text.
+2. Detect the primary emotion of the text in one word (e.g., Happy, Sad, Angry, Neutral, Excited).
+3. If the detected language is Dutch/Flemish (Vlaams, Nederlands):
+   - Translate the text to: ${targetLanguage !== 'Multilingual' ? targetLanguage : fallbackLanguage}.
+4. If the detected language is NOT Dutch/Flemish:
+   - Translate the text to: Dutch Flemish.
+   
+Respond ONLY with a valid JSON object matching this schema, no markdown blocks:
+{
+  "translation": "Translated text string",
+  "detectedLanguage": "The name of the language detected (e.g., English, Spanish, Dutch Flemish)",
+  "emotion": "Single word emotion"
+}
+
+Source text: "${transcriptText}"`;
+
+    const res = await ai.models.generateContent({
+      model,
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      config: {
+        responseMimeType: "application/json",
+        temperature: 0.1,
+      }
+    });
+
+    const resultText = res.text?.trim() || "{}";
+    const data = JSON.parse(resultText);
+    
+    const analysis = {
       transcript: transcriptText,
-      translation: transRes.translation,
-      language: transRes.detectedLang === "nl" ? "Dutch Flemish" : 
-                transRes.detectedLang === "en" ? "English" : 
-                transRes.detectedLang === "es" ? "Spanish" : 
-                transRes.detectedLang === "fr" ? "French" : 
-                transRes.detectedLang === "de" ? "German" : 
-                transRes.detectedLang === "ja" ? "Japanese" : transRes.detectedLang,
-      emotion,
+      translation: data.translation || "Translation Error",
+      language: data.detectedLanguage || "Unknown",
+      emotion: data.emotion || "Neutral",
       confidence: 99
     };
+    
+    if (onChunk) {
+      onChunk({
+        transcript: analysis.transcript,
+        translation: analysis.translation,
+        language: analysis.language,
+        emotion: analysis.emotion
+      });
+    }
+
+    return analysis;
   } catch (e) {
     console.error("Failed to parse analysis:", e);
     return {

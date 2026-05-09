@@ -10,8 +10,10 @@ import { analyzeText, speakTranslation } from './services/geminiService';
 import { startDeepgramTranscription, stopDeepgramTranscription } from './services/deepgramService';
 import { auth, rtdb } from './services/firebase';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
-import { ref, onValue, set, push } from 'firebase/database';
+import { ref, onValue, set, push, remove } from 'firebase/database';
 import { AuthPage } from './components/Auth';
+
+import { languages } from './languages';
 
 interface Interaction {
   id: string;
@@ -37,7 +39,7 @@ export default function App() {
   const [currentLanguage, setCurrentLanguage] = useState<string | null>(null);
   const [confidence, setConfidence] = useState<number>(0);
   const [lastNonTargetLanguage, setLastNonTargetLanguage] = useState<string | null>(null);
-  const [targetLanguage, setTargetLanguage] = useState<string>('Dutch Flemish');
+  const [targetLanguage, setTargetLanguage] = useState<string>('Multilingual');
   
   const [isDark, setIsDark] = useState(true);
   const [showProfile, setShowProfile] = useState(false);
@@ -67,16 +69,12 @@ export default function App() {
     return () => unsubscribe();
   }, [user]);
 
-  const isTargetLanguage = (lang: string | null, target: string) => {
+  const isDutchFlemish = (lang: string | null) => {
     if (!lang) return false;
     const l = lang.toLowerCase();
-    const t = target.toLowerCase();
-    if (t === 'dutch flemish') {
-      return l.includes('flemish') || l.includes('dutch') || l.includes('nederlands') || 
-             l.includes('vlaams') || l.includes('brabants') || l.includes('limburgs') || 
-             l.includes('antwerps') || l.includes('gents') || l.includes('kempens');
-    }
-    return l.includes(t);
+    return l.includes('flemish') || l.includes('dutch') || l.includes('nederlands') || 
+           l.includes('vlaams') || l.includes('brabants') || l.includes('limburgs') || 
+           l.includes('antwerps') || l.includes('gents') || l.includes('kempens');
   };
 
   const handleDeepgramStart = async () => {
@@ -141,8 +139,11 @@ export default function App() {
             setCurrentLanguage(analysis.language);
             setConfidence(analysis.confidence || Math.random() * 5 + 94);
 
-            if (analysis.language && !isTargetLanguage(analysis.language, targetLanguage)) {
+            if (analysis.language && !isDutchFlemish(analysis.language)) {
               setLastNonTargetLanguage(prev => prev || analysis.language);
+              if (targetLanguage === 'Multilingual') {
+                setTargetLanguage(analysis.language);
+              }
             }
 
             if (analysis.translation) {
@@ -341,14 +342,11 @@ export default function App() {
             <select 
               value={targetLanguage} 
               onChange={(e) => setTargetLanguage(e.target.value)}
-              className={`${isDark ? 'bg-[#2d3034] border-white/10 text-gray-300 hover:border-white/20' : 'bg-gray-100 border-gray-200 text-gray-800 hover:border-gray-300'} text-[10px] sm:text-xs font-mono border rounded-lg px-2 py-1 outline-none transition-colors w-24 sm:w-auto truncate`}
+              className={`${isDark ? 'bg-[#2d3034] border-white/10 text-gray-300 hover:border-white/20' : 'bg-gray-100 border-gray-200 text-gray-800 hover:border-gray-300'} text-[10px] sm:text-xs font-mono border rounded-lg px-2 sm:px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 transition-colors w-32 sm:w-auto truncate max-w-[150px] sm:max-w-xs`}
             >
-              <option value="Dutch Flemish">Flemish</option>
-              <option value="English">English</option>
-              <option value="Spanish">Spanish</option>
-              <option value="French">French</option>
-              <option value="German">German</option>
-              <option value="Japanese">Japanese</option>
+              {languages.map(lang => (
+                <option key={lang} value={lang}>{lang}</option>
+              ))}
             </select>
             <button 
               onClick={() => setShowSidebar(true)}
@@ -416,7 +414,7 @@ export default function App() {
               {/* Translation Area */}
               <div className="space-y-2 sm:space-y-3">
                 <h3 className="translation-label text-blue-400 ml-2 sm:ml-0">
-                  Translation {lastInteraction?.language && isTargetLanguage(lastInteraction.language, targetLanguage) ? `(${lastNonTargetLanguage || 'Fallback'})` : `(${targetLanguage})`}
+                  Translation {lastInteraction?.language && isDutchFlemish(lastInteraction.language) ? `(${targetLanguage === 'Multilingual' ? (lastNonTargetLanguage || 'English') : targetLanguage})` : `(Dutch Flemish)`}
                 </h3>
                 <div className="w-full min-h-[150px] sm:min-h-[180px] p-6 sm:p-8 rounded-[32px] sm:rounded-[40px] border border-blue-400/10 bg-blue-400/[0.02] dark-container flex flex-col gap-4 sm:gap-6">
                    {lastInteraction ? (
@@ -424,7 +422,7 @@ export default function App() {
                        <div className="flex justify-between items-center">
                          <div className="flex gap-2">
                            <span className="text-[10px] font-mono font-bold px-2 py-1 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 uppercase tracking-wider hidden sm:block">
-                             {lastInteraction.language && isTargetLanguage(lastInteraction.language, targetLanguage) ? (lastNonTargetLanguage || 'Fallback') : targetLanguage}
+                             {lastInteraction.language && isDutchFlemish(lastInteraction.language) ? (targetLanguage === 'Multilingual' ? (lastNonTargetLanguage || 'English') : targetLanguage) : 'Dutch Flemish'}
                            </span>
                            <span className="text-[10px] font-mono font-bold px-2 py-1 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 uppercase tracking-wider">
                              {lastInteraction.emotion || 'Neutral'}
@@ -464,6 +462,9 @@ export default function App() {
                onClick={() => {
                  setInteractions([]);
                  setLastNonTargetLanguage(null);
+                 if (user) {
+                   remove(ref(rtdb, `users/${user.uid}/history`));
+                 }
                }}
                className="p-2.5 sm:p-3 text-gray-400 hover:text-white transition-colors"
              >
