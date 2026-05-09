@@ -433,7 +433,18 @@ export default function App() {
                          </span>
                        </div>
                        <p className="text-xl sm:text-2xl font-medium text-blue-100 leading-relaxed">
-                         {lastInteraction.translation}
+                         {lastInteraction.translation === 'Translating...' ? (
+                           <span className="flex items-center gap-2 text-blue-400">
+                             Translating
+                             <span className="flex gap-1 items-center mt-1">
+                               <span className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-blue-400 animate-pulse" style={{ animationDelay: '0ms' }} />
+                               <span className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-blue-400 animate-pulse" style={{ animationDelay: '150ms' }} />
+                               <span className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-blue-400 animate-pulse" style={{ animationDelay: '300ms' }} />
+                             </span>
+                           </span>
+                         ) : (
+                           lastInteraction.translation
+                         )}
                        </p>
                      </>
                    ) : (
