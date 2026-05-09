@@ -12,6 +12,8 @@ import { auth, rtdb } from './services/firebase';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { ref, onValue, set, push, remove } from 'firebase/database';
 import { AuthPage } from './components/Auth';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 import { languages } from './languages';
 
@@ -23,6 +25,8 @@ interface Interaction {
   translation?: string;
   language?: string;
   emotion?: string;
+  words?: { word: string, punctuated_word: string, start: number, end: number, confidence: number }[];
+  detectedLanguage?: string;
 }
 
 export default function App() {
@@ -47,20 +51,40 @@ export default function App() {
 
   const exportHistory = () => {
     if (interactions.length === 0) return;
-    const exportData = interactions.map(item => ({
-      Timestamp: new Date(item.timestamp).toLocaleString(),
-      Language: item.language || 'Unknown',
-      Emotion: item.emotion || 'Unknown',
-      Transcription: item.text,
-      Translation: item.translation || ''
-    }));
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
-    const downloadAnchorNode = document.createElement('a');
-    downloadAnchorNode.setAttribute("href",     dataStr);
-    downloadAnchorNode.setAttribute("download", "neural_bridge_archive.json");
-    document.body.appendChild(downloadAnchorNode);
-    downloadAnchorNode.click();
-    downloadAnchorNode.remove();
+    
+    const doc = new jsPDF();
+    
+    doc.setFontSize(20);
+    doc.text('Transcription Archive', 14, 22);
+    doc.setFontSize(10);
+    doc.setTextColor(150);
+    doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 30);
+    
+    const tableData = interactions.map(item => [
+      new Date(item.timestamp).toLocaleString(),
+      item.language || 'Unknown',
+      item.emotion || 'Unknown',
+      item.text,
+      item.translation || ''
+    ]);
+
+    autoTable(doc, {
+      startY: 35,
+      head: [['Timestamp', 'Language', 'Emotion', 'Transcription', 'Translation']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [16, 185, 129] }, // emerald-500
+      styles: { fontSize: 8, cellPadding: 3 },
+      columnStyles: {
+        0: { cellWidth: 30 },
+        1: { cellWidth: 20 },
+        2: { cellWidth: 20 },
+        3: { cellWidth: 'auto' },
+        4: { cellWidth: 'auto' },
+      }
+    });
+
+    doc.save('transcription_archive.pdf');
   };
   
   useEffect(() => {
@@ -100,7 +124,8 @@ export default function App() {
     setIsListening(true);
     await startDeepgramTranscription(
       // onTranscript
-      async (text: string, isFinal: boolean) => {
+      async (text: string, isFinal: boolean, words?: any[], detectedLanguage?: string) => {
+        if (detectedLanguage) setCurrentLanguage(detectedLanguage);
         if (!isFinal) {
           setStreamingInteraction(prev => ({ 
             id: prev?.id || Date.now().toString(),
@@ -109,7 +134,9 @@ export default function App() {
             text: text, 
             translation: prev?.translation || 'Listening...',
             language: prev?.language,
-            emotion: prev?.emotion
+            emotion: prev?.emotion,
+            words: words,
+            detectedLanguage: detectedLanguage
           }));
         } else {
           // Received final transcript utterance
@@ -118,7 +145,9 @@ export default function App() {
             timestamp: Date.now(),
             type: 'user', 
             text: text, 
-            translation: 'Translating...' 
+            translation: 'Translating...',
+            words: words,
+            detectedLanguage: detectedLanguage
           });
           setIsProcessing(true);
           
@@ -146,6 +175,8 @@ export default function App() {
               translation: analysis.translation,
               language: analysis.language,
               emotion: analysis.emotion,
+              words: words,
+              detectedLanguage: detectedLanguage
             };
             
             if (user) {
@@ -245,59 +276,59 @@ export default function App() {
             className={`fixed right-0 top-0 bottom-0 w-72 z-50 ${isDark ? 'bg-[#16181b] border-white/5' : 'bg-white border-gray-200'} border-l p-6 flex flex-col gap-8 shadow-2xl transition-colors duration-300`}
           >
             <div className="flex justify-between items-center">
-              <h2 className="text-xs uppercase font-bold tracking-[0.2em] text-gray-500">Telemetry</h2>
-              <button onClick={() => setShowSidebar(false)} className="p-1 hover:bg-white/5 rounded">
-                <PanelRightClose className="w-5 h-5 text-gray-400" />
+              <h2 className={`text-xs uppercase font-bold tracking-[0.2em] ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Telemetry</h2>
+              <button onClick={() => setShowSidebar(false)} className={`p-1 rounded transition-colors ${isDark ? 'hover:bg-white/5 text-gray-400' : 'hover:bg-gray-100 text-gray-500'}`}>
+                <PanelRightClose className="w-5 h-5" />
               </button>
             </div>
             
             <div className="space-y-6">
               <div className="space-y-1">
-                <span className="text-[10px] uppercase font-bold text-gray-600 tracking-wider">Detected Language</span>
-                <p className="text-emerald-400 font-mono text-sm font-bold flex items-center gap-2">
+                <span className={`text-[10px] uppercase font-bold tracking-wider ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>Detected Language</span>
+                <p className={`font-mono text-sm font-bold flex items-center gap-2 ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>
                   <Languages className="w-4 h-4" />
                   {currentLanguage || 'SEARCHING...'}
                 </p>
               </div>
 
               <div className="space-y-1">
-                <span className="text-[10px] uppercase font-bold text-gray-600 tracking-wider">Confidence Score</span>
-                <p className="text-white font-mono text-sm font-bold flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-blue-400" />
+                <span className={`text-[10px] uppercase font-bold tracking-wider ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>Confidence Score</span>
+                <p className={`font-mono text-sm font-bold flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-800'}`}>
+                  <Activity className={`w-4 h-4 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
                   {confidence ? `${confidence.toFixed(1)}%` : '--.-%'}
                 </p>
               </div>
 
               <div className="space-y-1">
-                <span className="text-[10px] uppercase font-bold text-gray-600 tracking-wider">Primary Emotion</span>
-                <p className="text-amber-400 font-mono text-sm font-bold flex items-center gap-2">
+                <span className={`text-[10px] uppercase font-bold tracking-wider ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>Primary Emotion</span>
+                <p className={`font-mono text-sm font-bold flex items-center gap-2 ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
                   <Ghost className="w-4 h-4" />
                   {currentEmotion || 'ANALYZING...'}
                 </p>
               </div>
 
               <div className="space-y-1">
-                <span className="text-[10px] uppercase font-bold text-gray-600 tracking-wider">VAD State</span>
-                <div className={`text-sm font-mono font-bold flex items-center gap-2 ${isListening ? 'text-emerald-400' : 'text-gray-500'}`}>
-                  <div className={`w-2 h-2 rounded-full ${isListening ? 'bg-emerald-400 animate-pulse' : (isDark ? 'bg-gray-700' : 'bg-gray-300')}`} />
+                <span className={`text-[10px] uppercase font-bold tracking-wider ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>VAD State</span>
+                <div className={`text-sm font-mono font-bold flex items-center gap-2 ${isListening ? (isDark ? 'text-emerald-400' : 'text-emerald-600') : (isDark ? 'text-gray-500' : 'text-gray-400')}`}>
+                  <div className={`w-2 h-2 rounded-full ${isListening ? `animate-pulse ${isDark ? 'bg-emerald-400' : 'bg-emerald-500'}` : (isDark ? 'bg-gray-700' : 'bg-gray-300')}`} />
                   {isListening ? 'ACTIVE' : 'IDLE'}
                 </div>
               </div>
             </div>
 
-            <div className="mt-auto border-t border-white/5 pt-6 space-y-4">
+            <div className={`mt-auto border-t pt-6 space-y-4 ${isDark ? 'border-white/5' : 'border-gray-200'}`}>
               <button 
                 onClick={() => { setShowSidebar(false); setShowHistory(true); }}
-                className="w-full py-3 px-4 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 flex items-center gap-3 transition-colors text-sm text-gray-200"
+                className={`w-full py-3 px-4 rounded-lg flex items-center gap-3 transition-colors text-sm border ${isDark ? 'bg-white/5 hover:bg-white/10 border-white/5 text-gray-200' : 'bg-gray-100 hover:bg-gray-200 border-gray-200 text-gray-700'}`}
               >
-                <History className="w-4 h-4 opacity-70 text-gray-200" />
+                <History className={`w-4 h-4 opacity-70 ${isDark ? 'text-gray-200' : 'text-gray-700'}`} />
                 Session History
               </button>
               <button 
                 onClick={() => setShowProfile(!showProfile)}
-                className="w-full py-3 px-4 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 flex items-center gap-3 transition-colors text-sm text-gray-200"
+                className={`w-full py-3 px-4 rounded-lg flex items-center gap-3 transition-colors text-sm border ${isDark ? 'bg-white/5 hover:bg-white/10 border-white/5 text-gray-200' : 'bg-gray-100 hover:bg-gray-200 border-gray-200 text-gray-700'}`}
               >
-                <UserIcon className="w-4 h-4 opacity-70 text-gray-200" />
+                <UserIcon className={`w-4 h-4 opacity-70 ${isDark ? 'text-gray-200' : 'text-gray-700'}`} />
                 Profile
               </button>
               
@@ -321,7 +352,7 @@ export default function App() {
 
               <button 
                 onClick={() => signOut(auth)}
-                className="w-full py-3 px-4 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 flex items-center gap-3 transition-colors text-sm text-red-400"
+                className={`w-full py-3 px-4 rounded-lg flex items-center gap-3 transition-colors text-sm border ${isDark ? 'bg-red-500/10 hover:bg-red-500/20 border-red-500/20 text-red-400' : 'bg-red-50 hover:bg-red-100 border-red-200 text-red-600'}`}
               >
                 <LogOut className="w-4 h-4 opacity-70" />
                 Sign Out
@@ -408,7 +439,7 @@ export default function App() {
                        <div className="flex justify-between items-center">
                          <div className="flex gap-2">
                            <span className={`text-[10px] font-mono font-bold px-2 py-1 rounded uppercase tracking-wider hidden sm:block ${isDark ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-emerald-100 text-emerald-700 border border-emerald-200'}`}>
-                             {lastInteraction.language || 'Detecting'}
+                             {lastInteraction.language || lastInteraction.detectedLanguage || 'Detecting'}
                            </span>
                            <span className={`text-[10px] font-mono font-bold px-2 py-1 rounded uppercase tracking-wider ${isDark ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-amber-100 text-amber-700 border border-amber-200'}`}>
                              {lastInteraction.emotion || 'Neutral'}
@@ -418,9 +449,26 @@ export default function App() {
                            Source Input
                          </span>
                        </div>
-                       <p className={`text-xl sm:text-2xl font-medium leading-relaxed ${isDark ? 'text-gray-300' : 'text-gray-900'}`}>
-                         {lastInteraction.text}
-                       </p>
+                       <div className={`text-xl sm:text-2xl font-medium leading-relaxed flex flex-wrap gap-[0.25em] ${isDark ? 'text-gray-300' : 'text-gray-900'}`}>
+                         {lastInteraction.words && lastInteraction.words.length > 0 ? (
+                            lastInteraction.words.map((w: any, idx: number) => {
+                              const isRecent = idx >= lastInteraction.words!.length - 2;
+                              return (
+                                <motion.span 
+                                  key={idx} 
+                                  initial={{ opacity: 0, y: 5 }} 
+                                  animate={{ opacity: 1, y: 0 }} 
+                                  transition={{ duration: 0.2 }}
+                                  className={isRecent ? (isDark ? 'text-emerald-400' : 'text-emerald-600') : ''}
+                                >
+                                  {w.punctuated_word || w.word}
+                                </motion.span>
+                              )
+                            })
+                         ) : (
+                           lastInteraction.text
+                         )}
+                       </div>
                      </>
                    ) : (
                      <div className="flex-1 flex items-center justify-center">
@@ -447,9 +495,20 @@ export default function App() {
                              {lastInteraction.emotion || 'Neutral'}
                            </span>
                          </div>
-                         <span className={`text-[9px] sm:text-[10px] font-mono tracking-widest uppercase font-bold text-right ${isDark ? 'text-blue-400/50' : 'text-blue-600/70'}`}>
-                           Neural Output
-                         </span>
+                         <div className="flex items-center gap-2">
+                           {lastInteraction.translation && lastInteraction.translation !== 'Translating...' && (
+                             <button
+                               onClick={() => speakTranslation(lastInteraction.translation!, lastInteraction.emotion)}
+                               className={`p-1.5 rounded-full transition-colors ${isSpeaking ? 'animate-pulse text-emerald-400' : (isDark ? 'hover:bg-blue-500/20 text-blue-400/80' : 'hover:bg-blue-200 text-blue-600/80')}`}
+                               title="Read Translation"
+                             >
+                               <Volume2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                             </button>
+                           )}
+                           <span className={`text-[9px] sm:text-[10px] font-mono tracking-widest uppercase font-bold text-right ${isDark ? 'text-blue-400/50' : 'text-blue-600/70'}`}>
+                             Neural Output
+                           </span>
+                         </div>
                        </div>
                        <p className={`text-xl sm:text-2xl font-medium leading-relaxed ${isDark ? 'text-blue-100' : 'text-blue-900'}`}>
                          {lastInteraction.translation === 'Translating...' ? (
@@ -544,20 +603,20 @@ export default function App() {
             exit={{ y: '100%' }}
             className={`fixed inset-0 z-[60] ${isDark ? 'bg-[#16181b]' : 'bg-gray-50'} flex flex-col transition-colors duration-300`}
           >
-            <div className="px-8 py-10 flex justify-between items-center border-b border-white/5">
+            <div className={`px-8 py-10 flex justify-between items-center border-b ${isDark ? 'border-white/5' : 'border-gray-200'}`}>
                 <div className="flex items-center gap-3">
-                  <History className="w-6 h-6 text-gray-400" />
-                  <h2 className="text-xl font-bold tracking-tight">Transcription Archive</h2>
+                  <History className={`w-6 h-6 ${isDark ? 'text-gray-400' : 'text-gray-600'}`} />
+                  <h2 className={`text-xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>Transcription Archive</h2>
                 </div>
                 <div className="flex items-center gap-4">
                   {interactions.length > 0 && (
-                    <button onClick={exportHistory} className="flex items-center gap-2 px-4 py-3 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 rounded-full transition-colors text-sm font-bold font-mono tracking-widest uppercase border border-emerald-500/20">
+                    <button onClick={exportHistory} className={`flex items-center gap-2 px-4 py-3 rounded-full transition-colors text-sm font-bold font-mono tracking-widest uppercase border ${isDark ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border-emerald-500/20' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-emerald-200'}`}>
                       <Download className="w-4 h-4" />
                       Export
                     </button>
                   )}
-                  <button onClick={() => setShowHistory(false)} className="p-3 bg-white/5 hover:bg-white/10 rounded-full transition-colors">
-                      <RotateCcw className="w-6 h-6 text-gray-300 rotate-90" />
+                  <button onClick={() => setShowHistory(false)} className={`p-3 rounded-full transition-colors ${isDark ? 'bg-white/5 hover:bg-white/10 text-gray-300' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}`}>
+                      <RotateCcw className="w-6 h-6 rotate-90" />
                   </button>
                 </div>
             </div>
@@ -580,7 +639,16 @@ export default function App() {
                         <div className="space-y-2">
                            <p className={`text-xl leading-relaxed ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>{item.text}</p>
                            {item.translation && (
-                             <p className={`text-lg leading-relaxed italic ${isDark ? 'text-blue-400/80' : 'text-blue-700/80'}`}>{item.translation}</p>
+                             <div className="flex items-start gap-2">
+                               <p className={`flex-1 text-lg leading-relaxed italic ${isDark ? 'text-blue-400/80' : 'text-blue-700/80'}`}>{item.translation}</p>
+                               <button
+                                 onClick={() => speakTranslation(item.translation!, item.emotion)}
+                                 className={`p-1.5 mt-1 rounded-full shrink-0 transition-colors ${isDark ? 'hover:bg-blue-500/20 text-blue-400/80' : 'hover:bg-blue-200 text-blue-600/80'}`}
+                                 title="Read Translation"
+                               >
+                                 <Volume2 className="w-4 h-4" />
+                               </button>
+                             </div>
                            )}
                         </div>
                     </div>

@@ -8,7 +8,7 @@ let stream: MediaStream | null = null;
 let recordingInterval: any = null;
 
 export const startDeepgramTranscription = async (
-  onTranscript: (text: string, isFinal: boolean) => void,
+  onTranscript: (text: string, isFinal: boolean, words: any[], detectedLanguage?: string) => void,
   onSpeechStarted: () => void,
   onSpeechEnded: () => void,
   onError: (err: any) => void
@@ -18,16 +18,17 @@ export const startDeepgramTranscription = async (
 
     connection = await deepgram.listen.v1.connect({
       model: 'nova-3',
-      language: 'multi',
+      detect_language: true,
       smart_format: true,
       interim_results: true,
       utterance_end_ms: 2000,
-      endpointing: 1000,
+      endpointing: 500,
       vad_events: true,
       numerals: true,
     } as any);
 
     let sentenceBuffer = '';
+    let wordsBuffer: any[] = [];
 
     connection.on('open', async () => {
       console.log('Deepgram Connection opened.');
@@ -59,25 +60,32 @@ export const startDeepgramTranscription = async (
       
       if (data.type === 'Results' && data.channel?.alternatives?.[0]) {
         const transcript = data.channel.alternatives[0].transcript;
+        const words = data.channel.alternatives[0].words || [];
+        // Deepgram returns language detection in nova-2 if requested
+        const detectedLanguage = data.channel.alternatives[0].languages ? data.channel.alternatives[0].languages[0] : undefined;
         
         if (data.is_final) {
           if (transcript) {
             sentenceBuffer += (sentenceBuffer ? ' ' : '') + transcript;
+            wordsBuffer = [...wordsBuffer, ...words];
           }
           if (data.speech_final) {
             const finalSentence = sentenceBuffer;
+            const finalWords = [...wordsBuffer];
             sentenceBuffer = '';
+            wordsBuffer = [];
             if (finalSentence.trim().length > 0) {
-              onTranscript(finalSentence.trim(), true);
+              onTranscript(finalSentence.trim(), true, finalWords, detectedLanguage);
             }
           } else {
-            onTranscript(sentenceBuffer.trim(), false);
+            onTranscript(sentenceBuffer.trim(), false, wordsBuffer, detectedLanguage);
           }
         } else {
           // It's an interim result
           const interimSentence = sentenceBuffer + (sentenceBuffer ? ' ' : '') + (transcript || '');
+          const interimWords = [...wordsBuffer, ...words];
           if (interimSentence.trim().length > 0) {
-            onTranscript(interimSentence.trim(), false);
+            onTranscript(interimSentence.trim(), false, interimWords, detectedLanguage);
           }
         }
       }
@@ -85,8 +93,10 @@ export const startDeepgramTranscription = async (
       if (data.type === 'UtteranceEnd') {
         if (sentenceBuffer.trim().length > 0) {
           const finalSentence = sentenceBuffer;
+          const finalWords = [...wordsBuffer];
           sentenceBuffer = '';
-          onTranscript(finalSentence.trim(), true);
+          wordsBuffer = [];
+          onTranscript(finalSentence.trim(), true, finalWords);
         }
         onSpeechEnded();
       }
