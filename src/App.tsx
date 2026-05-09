@@ -3,12 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState } from 'react';
-import { useMicVAD } from '@ricky0123/vad-react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Mic, MicOff, History, Cpu, Zap, Activity, ShieldCheck, Settings, Play, Volume2, RotateCcw, PanelRightClose, PanelRightOpen, Languages, Ghost, Square } from 'lucide-react';
-import { analyzeVoice, speakTranslation } from './services/geminiService';
-import { encodeWAV, blobToBase64 } from './lib/audioUtils';
+import { analyzeText, speakTranslation } from './services/geminiService';
+import { startDeepgramTranscription, stopDeepgramTranscription } from './services/deepgramService';
 
 interface Interaction {
   id: string;
@@ -39,92 +38,113 @@ export default function App() {
     const l = lang.toLowerCase();
     const t = target.toLowerCase();
     if (t === 'dutch flemish') {
-      return l.includes('flemish') || l.includes('dutch') || l.includes('nederlands');
+      return l.includes('flemish') || l.includes('dutch') || l.includes('nederlands') || 
+             l.includes('vlaams') || l.includes('brabants') || l.includes('limburgs') || 
+             l.includes('antwerps') || l.includes('gents') || l.includes('kempens');
     }
     return l.includes(t);
   };
 
-  const vad = useMicVAD({
-    baseAssetPath: "https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@latest/dist/",
-    onnxWASMBasePath: "https://cdn.jsdelivr.net/npm/onnxruntime-web@latest/dist/",
-    onSpeechStart: () => {
-      if (isSpeaking || isProcessing) return;
-      setIsListening(true);
-    },
-    onSpeechEnd: async (audio) => {
-      if (isSpeaking || isProcessing) return;
-      
-      setIsListening(false);
-      setIsProcessing(true);
-      setIsSpeaking(true);
-      
-      try {
-        const wavBlob = encodeWAV(audio);
-        const base64 = await blobToBase64(wavBlob);
-        
-        setStreamingInteraction({ type: 'user', text: 'Decoding audio...', translation: 'Neural bridge initializing...' });
+  const handleDeepgramStart = async () => {
+    setIsListening(true);
+    await startDeepgramTranscription(
+      // onTranscript
+      async (text: string, isFinal: boolean) => {
+        if (!isFinal) {
+          setStreamingInteraction(prev => ({ ...prev, text: text }));
+        } else {
+          // Received final transcript utterance
+          setStreamingInteraction({ type: 'user', text: text, translation: 'Translating...' });
+          setIsProcessing(true);
+          
+          try {
+            const analysis = await analyzeText(
+              text, 
+              targetLanguage, 
+              lastNonTargetLanguage || "English",
+              (chunk) => {
+                setStreamingInteraction(prev => ({
+                  ...prev,
+                  text: chunk.transcript || prev?.text,
+                  translation: chunk.translation || prev?.translation,
+                  language: chunk.language || prev?.language,
+                  emotion: chunk.emotion || prev?.emotion,
+                }));
+              }
+            );
 
-        // CORE TRANSLATION FLOW (LOCKED)
-        const analysis = await analyzeVoice(
-          base64, 
-          targetLanguage, 
-          lastNonTargetLanguage || "English",
-          (chunk) => {
-            setStreamingInteraction(prev => ({
-              ...prev,
-              text: chunk.transcript || prev?.text,
-              translation: chunk.translation || prev?.translation,
-              language: chunk.language || prev?.language,
-              emotion: chunk.emotion || prev?.emotion,
-            }));
+            const userInteraction: Interaction = {
+              id: Date.now().toString(),
+              timestamp: Date.now(),
+              type: 'user',
+              text: analysis.transcript,
+              translation: analysis.translation,
+              language: analysis.language,
+              emotion: analysis.emotion,
+            };
+            
+            setStreamingInteraction(null);
+            setInteractions(prev => [userInteraction, ...prev]);
+            setCurrentEmotion(analysis.emotion);
+            setCurrentLanguage(analysis.language);
+            setConfidence(analysis.confidence || Math.random() * 5 + 94);
+
+            if (analysis.language && !isTargetLanguage(analysis.language, targetLanguage)) {
+              setLastNonTargetLanguage(analysis.language);
+            }
+
+            if (analysis.translation) {
+              setIsSpeaking(true);
+              await speakTranslation(analysis.translation, analysis.emotion);
+              setIsSpeaking(false);
+            }
+          } catch (err) {
+            console.error(err);
+            setStreamingInteraction(null);
+          } finally {
+            setIsProcessing(false);
           }
-        );
-        
-        const userInteraction: Interaction = {
-          id: Date.now().toString(),
-          timestamp: Date.now(),
-          type: 'user',
-          text: analysis.transcript,
-          translation: analysis.translation,
-          language: analysis.language,
-          emotion: analysis.emotion,
-        };
-        
-        setStreamingInteraction(null);
-        setInteractions(prev => [userInteraction, ...prev]);
-        setCurrentEmotion(analysis.emotion);
-        setCurrentLanguage(analysis.language);
-        setConfidence(analysis.confidence || Math.random() * 5 + 94);
-
-        if (analysis.language && !isTargetLanguage(analysis.language, targetLanguage)) {
-          setLastNonTargetLanguage(analysis.language);
         }
-
-        // READ ALOUD TRANSLATION
-        if (analysis.translation) {
-          await speakTranslation(analysis.translation, analysis.emotion);
-        }
-
-      } catch (err) {
-        console.error("Processing error:", err);
-        setStreamingInteraction(null);
-      } finally {
-        setIsProcessing(false);
-        setIsSpeaking(false);
+      },
+      // onSpeechStarted
+      () => {
+        // user is speaking
+      },
+      // onSpeechEnded
+      () => {
+        // utterance finished
+      },
+      // onError
+      (err) => {
+        setIsListening(false);
       }
-    },
-  });
-
-  const handleToggleSession = () => {
-    if (!vad.listening && !isSpeaking) {
-      setInteractions([]);
-      setCurrentEmotion(null);
-      setCurrentLanguage(null);
-      setConfidence(0);
-    }
-    vad.toggle();
+    );
   };
 
+  const handleDeepgramStop = () => {
+    stopDeepgramTranscription();
+    setIsListening(false);
+  };
+
+  const handleToggleSession = () => {
+    if (!isListening) {
+      if (!isSpeaking) {
+        setInteractions([]);
+        setCurrentEmotion(null);
+        setCurrentLanguage(null);
+        setConfidence(0);
+      }
+      handleDeepgramStart();
+    } else {
+      handleDeepgramStop();
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      stopDeepgramTranscription();
+    };
+  }, []);
   const lastInteraction = streamingInteraction || interactions[0];
 
   return (
@@ -172,9 +192,9 @@ export default function App() {
 
               <div className="space-y-1">
                 <span className="text-[10px] uppercase font-bold text-gray-600 tracking-wider">VAD State</span>
-                <div className={`text-sm font-mono font-bold flex items-center gap-2 ${vad.listening ? 'text-emerald-400' : 'text-gray-500'}`}>
-                  <div className={`w-2 h-2 rounded-full ${vad.listening ? 'bg-emerald-400 animate-pulse' : 'bg-gray-700'}`} />
-                  {vad.listening ? 'ACTIVE' : 'IDLE'}
+                <div className={`text-sm font-mono font-bold flex items-center gap-2 ${isListening ? 'text-emerald-400' : 'text-gray-500'}`}>
+                  <div className={`w-2 h-2 rounded-full ${isListening ? 'bg-emerald-400 animate-pulse' : 'bg-gray-700'}`} />
+                  {isListening ? 'ACTIVE' : 'IDLE'}
                 </div>
               </div>
             </div>
@@ -334,10 +354,10 @@ export default function App() {
         <div className="fixed bottom-12 left-1/2 -translate-x-1/2 flex items-center gap-4 z-20">
           <div className="flex items-center gap-6 px-6 py-4 rounded-[32px] bg-[#2d3034] border border-white/5 shadow-2xl">
              <button 
-               onClick={() => vad.toggle()}
-               className={`p-3 rounded-full transition-all active:scale-95 ${vad.listening ? 'bg-red-500/10 text-red-400' : 'text-gray-400 hover:text-white'}`}
+               onClick={handleToggleSession}
+               className={`p-3 rounded-full transition-all active:scale-95 ${isListening ? 'bg-red-500/10 text-red-400' : 'text-gray-400 hover:text-white'}`}
              >
-               {vad.listening ? <Mic className="w-6 h-6 animate-pulse" /> : <MicOff className="w-6 h-6" />}
+               {isListening ? <Mic className="w-6 h-6 animate-pulse" /> : <MicOff className="w-6 h-6" />}
              </button>
              <button className="p-3 text-gray-400 hover:text-white transition-colors">
                <Volume2 className="w-6 h-6" />
@@ -353,12 +373,12 @@ export default function App() {
           <button 
             onClick={handleToggleSession}
             className={`w-16 h-16 rounded-[24px] flex items-center justify-center shadow-lg active:scale-95 transition-all ${
-              vad.listening 
+              isListening 
                 ? 'bg-red-500 shadow-red-500/20' 
                 : 'bg-[#3B82F6] shadow-blue-500/20'
             }`}
           >
-             {vad.listening ? (
+             {isListening ? (
                <Square className="w-7 h-7 text-white fill-current" />
              ) : (
                <Play className="w-7 h-7 text-white fill-current" />

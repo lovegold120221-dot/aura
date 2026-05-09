@@ -124,84 +124,87 @@ export interface VoiceAnalysis {
 // Logic: 
 // 1. Every non-Flemish language -> Translated to Dutch Flemish.
 // 2. Every Dutch Flemish language -> Translated back to the last detected non-Flemish language (fallback: English).
-export async function analyzeVoice(
-  audioBase64: string, 
+const langMap: Record<string, string> = {
+  "Dutch Flemish": "nl",
+  "English": "en",
+  "Spanish": "es",
+  "French": "fr",
+  "German": "de",
+  "Japanese": "ja"
+};
+
+async function getGoogleTranslate(text: string, to: string) {
+  const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${to}&dt=t&q=${encodeURIComponent(text)}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  const translation = data[0].map((item: any) => item[0]).join("");
+  const detectedLang = data[2]; // e.g., 'en', 'nl'
+  return { translation, detectedLang };
+}
+
+export async function analyzeText(
+  transcriptText: string, 
   targetLanguage: string = "Dutch Flemish", 
   fallbackLanguage: string = "English",
   onChunk?: (partial: Partial<VoiceAnalysis>) => void
 ): Promise<VoiceAnalysis> {
-  const model = "gemini-flash-latest";
-  
-  const responseStream = await ai.models.generateContentStream({
-    model,
-    contents: [
-      {
-        parts: [
-          {
-            text: `ACT AS NEURAL INTERPRETER. 
-1. Detect input language.
-2. Provide verbatim transcript.
-3. Translate to ${targetLanguage}.
-   - EXCEPTION: If the detected input language IS ${targetLanguage}, translate the text into ${fallbackLanguage} instead.
-4. Detect emotion.
-Output JSON only. Be extremely fast.`,
-          },
-          {
-            inlineData: {
-              data: audioBase64,
-              mimeType: "audio/wav",
-            },
-          },
-        ],
-      },
-    ],
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          transcript: { type: Type.STRING },
-          translation: { type: Type.STRING },
-          language: { type: Type.STRING },
-          emotion: { type: Type.STRING },
-          confidence: { type: Type.NUMBER },
-        },
-        required: ["transcript", "translation", "language", "emotion"],
-      },
-    },
-  });
-
-  let fullText = "";
-  for await (const chunk of responseStream) {
-    fullText += chunk.text;
-    if (onChunk) {
-      try {
-        // Crude partial JSON parser for UI feedback
-        const transcriptMatch = fullText.match(/"transcript"\s*:\s*"([^"]*)"?/);
-        const translationMatch = fullText.match(/"translation"\s*:\s*"([^"]*)"?/);
-        const languageMatch = fullText.match(/"language"\s*:\s*"([^"]*)"?/);
-        const emotionMatch = fullText.match(/"emotion"\s*:\s*"([^"]*)"?/);
-        
-        onChunk({
-          transcript: transcriptMatch ? transcriptMatch[1] : undefined,
-          translation: translationMatch ? translationMatch[1] : undefined,
-          language: languageMatch ? languageMatch[1] : undefined,
-          emotion: emotionMatch ? emotionMatch[1] : undefined,
-        });
-      } catch (e) { /* ignore */ }
-    }
-  }
-
   try {
-    return JSON.parse(fullText) as VoiceAnalysis;
+    // Start Google Translate
+    let toCode = langMap[targetLanguage] || "nl";
+    let transRes = await getGoogleTranslate(transcriptText, toCode);
+    
+    // If it detected the target language (e.g. Dutch), we reverse translate to fallback
+    if (transRes.detectedLang === toCode || (toCode === 'nl' && transRes.detectedLang === 'nl')) {
+      const fallbackCode = langMap[fallbackLanguage] || "en";
+      transRes = await getGoogleTranslate(transcriptText, fallbackCode);
+    }
+    
+    if (onChunk) {
+      onChunk({
+        transcript: transcriptText,
+        translation: transRes.translation,
+        language: transRes.detectedLang
+      });
+    }
+
+    // Now get the emotion from Gemini very quickly
+    const model = "gemini-3.1-flash-lite";
+    const emotionRes = await ai.models.generateContent({
+      model,
+      contents: [
+        { role: "user", parts: [{ text: `Detect the primary emotion of this text in one word (e.g., Happy, Sad, Angry, Neutral, Excited).\nText: "${transcriptText}"` }] }
+      ]
+    });
+    
+    const emotion = emotionRes.text?.trim() || "Neutral";
+    
+    if (onChunk) {
+      onChunk({
+        emotion
+      });
+    }
+
+    return {
+      transcript: transcriptText,
+      translation: transRes.translation,
+      language: transRes.detectedLang === "nl" ? "Dutch Flemish" : 
+                transRes.detectedLang === "en" ? "English" : 
+                transRes.detectedLang === "es" ? "Spanish" : 
+                transRes.detectedLang === "fr" ? "French" : 
+                transRes.detectedLang === "de" ? "German" : 
+                transRes.detectedLang === "ja" ? "Japanese" : transRes.detectedLang,
+      emotion,
+      confidence: 99
+    };
   } catch (e) {
     console.error("Failed to parse analysis:", e);
     return {
-      transcript: "Error parsing transcript",
-      translation: "Fout bij het parseren van het script",
+      transcript: transcriptText,
+      translation: "Error processing translation",
       language: "Unknown",
-      emotion: "Unknown",
+      emotion: "Neutral",
       confidence: 0
     };
   }
 }
+
