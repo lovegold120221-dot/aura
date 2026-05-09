@@ -5,11 +5,12 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Mic, MicOff, History, Cpu, Zap, Activity, ShieldCheck, Settings, Play, Volume2, RotateCcw, PanelRightClose, PanelRightOpen, Languages, Ghost, Square, LogOut } from 'lucide-react';
+import { Mic, MicOff, History, Cpu, Zap, Activity, ShieldCheck, Settings, Play, Volume2, RotateCcw, PanelRightClose, PanelRightOpen, Languages, Ghost, Square, LogOut, Sun, Moon, User as UserIcon, Mail } from 'lucide-react';
 import { analyzeText, speakTranslation } from './services/geminiService';
 import { startDeepgramTranscription, stopDeepgramTranscription } from './services/deepgramService';
-import { auth } from './services/firebase';
+import { auth, rtdb } from './services/firebase';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
+import { ref, onValue, set, push } from 'firebase/database';
 import { AuthPage } from './components/Auth';
 
 interface Interaction {
@@ -38,6 +39,34 @@ export default function App() {
   const [lastNonTargetLanguage, setLastNonTargetLanguage] = useState<string | null>(null);
   const [targetLanguage, setTargetLanguage] = useState<string>('Dutch Flemish');
   
+  const [isDark, setIsDark] = useState(true);
+  const [showProfile, setShowProfile] = useState(false);
+  
+  useEffect(() => {
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDark]);
+
+  useEffect(() => {
+    if (!user) return;
+    const historyRef = ref(rtdb, `users/${user.uid}/history`);
+    const unsubscribe = onValue(historyRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const parsed: Interaction[] = Object.values(data);
+        parsed.sort((a, b) => b.timestamp - a.timestamp);
+        setInteractions(parsed);
+      } else {
+        setInteractions([]);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
   const isTargetLanguage = (lang: string | null, target: string) => {
     if (!lang) return false;
     const l = lang.toLowerCase();
@@ -102,8 +131,12 @@ export default function App() {
               emotion: analysis.emotion,
             };
             
+            if (user) {
+              const historyRef = ref(rtdb, `users/${user.uid}/history/${userInteraction.id}`);
+              set(historyRef, userInteraction);
+            }
+            
             setStreamingInteraction(null);
-            setInteractions(prev => [userInteraction, ...prev]);
             setCurrentEmotion(analysis.emotion);
             setCurrentLanguage(analysis.language);
             setConfidence(analysis.confidence || Math.random() * 5 + 94);
@@ -180,7 +213,7 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen w-full bg-[#1a1c1e] text-[#e2e8f0] font-sans overflow-hidden safe-area-inset relative">
+    <div className={`flex h-screen w-full ${isDark ? 'bg-[#1a1c1e] text-[#e2e8f0]' : 'bg-gray-50 text-gray-900'} font-sans overflow-hidden safe-area-inset relative transition-colors duration-300`}>
       {/* Sidebar Overlay for Mobile / Content for Desktop */}
       <AnimatePresence>
         {showSidebar && (
@@ -188,7 +221,7 @@ export default function App() {
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
-            className="fixed right-0 top-0 bottom-0 w-72 z-50 bg-[#16181b] border-l border-white/5 p-6 flex flex-col gap-8 shadow-2xl"
+            className={`fixed right-0 top-0 bottom-0 w-72 z-50 ${isDark ? 'bg-[#16181b] border-white/5' : 'bg-white border-gray-200'} border-l p-6 flex flex-col gap-8 shadow-2xl transition-colors duration-300`}
           >
             <div className="flex justify-between items-center">
               <h2 className="text-xs uppercase font-bold tracking-[0.2em] text-gray-500">Telemetry</h2>
@@ -233,16 +266,38 @@ export default function App() {
 
             <div className="mt-auto border-t border-white/5 pt-6 space-y-4">
               <button 
-                onClick={() => setShowHistory(true)}
-                className="w-full py-3 px-4 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 flex items-center gap-3 transition-colors text-sm"
+                onClick={() => { setShowSidebar(false); setShowHistory(true); }}
+                className="w-full py-3 px-4 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 flex items-center gap-3 transition-colors text-sm text-gray-200"
               >
-                <History className="w-4 h-4 opacity-70" />
+                <History className="w-4 h-4 opacity-70 text-gray-200" />
                 Session History
               </button>
-              <button className="w-full py-3 px-4 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 flex items-center gap-3 transition-colors text-sm">
-                <Settings className="w-4 h-4 opacity-70" />
-                Preferences
+              <button 
+                onClick={() => setShowProfile(!showProfile)}
+                className="w-full py-3 px-4 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 flex items-center gap-3 transition-colors text-sm text-gray-200"
+              >
+                <UserIcon className="w-4 h-4 opacity-70 text-gray-200" />
+                Profile
               </button>
+              
+              {showProfile && user && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className={`${isDark ? 'bg-[#2d3034] border-white/10' : 'bg-gray-100 border-gray-200'} rounded-lg p-4 space-y-3 border overflow-hidden transition-colors duration-300`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-emerald-500/20 text-emerald-500 flex items-center justify-center font-bold pb-0.5 shrink-0">
+                      {user.displayName?.charAt(0) || user.email?.charAt(0)?.toUpperCase() || 'U'}
+                    </div>
+                    <div className="flex flex-col overflow-hidden">
+                      <span className={`text-sm font-medium ${isDark ? 'text-white' : 'text-gray-900'} truncate`}>{user.displayName || 'User'}</span>
+                      <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'} flex items-center gap-1 truncate`}><Mail className="w-3 h-3 shrink-0" /> <span className="truncate">{user.email}</span></span>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
               <button 
                 onClick={() => signOut(auth)}
                 className="w-full py-3 px-4 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 flex items-center gap-3 transition-colors text-sm text-red-400"
@@ -258,8 +313,8 @@ export default function App() {
       {/* Main UI */}
       <div className="flex-1 flex flex-col h-full relative">
         {/* Header */}
-        <header className="h-16 px-4 sm:px-6 flex justify-between items-center border-b border-white/5 bg-[#1a1c1e] z-10 shrink-0">
-          <div className="hidden sm:flex p-2 rounded-lg bg-[#2d3034] border border-white/10">
+        <header className={`h-16 px-4 sm:px-6 flex justify-between items-center border-b ${isDark ? 'border-white/5 bg-[#1a1c1e]' : 'border-gray-200 bg-white'} z-10 shrink-0 transition-colors duration-300`}>
+          <div className={`hidden sm:flex p-2 rounded-lg ${isDark ? 'bg-[#2d3034] border-white/10' : 'bg-gray-100 border-gray-200'} border`}>
              <Zap className="w-5 h-5 text-gray-200 fill-current opacity-70" />
           </div>
           
@@ -285,7 +340,7 @@ export default function App() {
             <select 
               value={targetLanguage} 
               onChange={(e) => setTargetLanguage(e.target.value)}
-              className="bg-[#2d3034] text-[10px] sm:text-xs font-mono border border-white/10 rounded-lg px-2 py-1 text-gray-300 outline-none hover:border-white/20 transition-colors w-24 sm:w-auto truncate"
+              className={`${isDark ? 'bg-[#2d3034] border-white/10 text-gray-300 hover:border-white/20' : 'bg-gray-100 border-gray-200 text-gray-800 hover:border-gray-300'} text-[10px] sm:text-xs font-mono border rounded-lg px-2 py-1 outline-none transition-colors w-24 sm:w-auto truncate`}
             >
               <option value="Dutch Flemish">Flemish</option>
               <option value="English">English</option>
@@ -300,8 +355,11 @@ export default function App() {
             >
               <PanelRightOpen className="w-5 h-5" />
             </button>
-            <button className="hidden sm:block p-1.5 sm:p-2 text-gray-400 hover:text-white transition-colors">
-              <Settings className="w-5 h-5" />
+            <button 
+              onClick={() => setIsDark(!isDark)}
+              className="hidden sm:block p-1.5 sm:p-2 text-gray-400 hover:text-white transition-colors"
+            >
+              {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>
           </div>
         </header>
@@ -391,7 +449,7 @@ export default function App() {
 
         {/* Floating Controls */}
         <div className="fixed bottom-6 sm:bottom-12 left-1/2 -translate-x-1/2 flex items-center gap-2 sm:gap-4 z-20 w-[95%] max-w-fit justify-center">
-          <div className="flex items-center gap-2 sm:gap-6 px-4 sm:px-6 py-3 sm:py-4 rounded-[24px] sm:rounded-[32px] bg-[#2d3034] border border-white/5 shadow-2xl">
+          <div className={`flex items-center gap-2 sm:gap-6 px-4 sm:px-6 py-3 sm:py-4 rounded-[24px] sm:rounded-[32px] ${isDark ? 'bg-[#2d3034] border-white/5' : 'bg-white border-gray-200 overflow-hidden shadow-xl'} border shadow-2xl transition-colors duration-300`}>
              <button 
                onClick={handleToggleSession}
                className={`p-2.5 sm:p-3 rounded-full transition-all active:scale-95 ${isListening ? 'bg-red-500/10 text-red-400' : 'text-gray-400 hover:text-white'}`}
@@ -446,7 +504,7 @@ export default function App() {
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
-            className="fixed inset-0 z-[60] bg-[#16181b] flex flex-col"
+            className={`fixed inset-0 z-[60] ${isDark ? 'bg-[#16181b]' : 'bg-gray-50'} flex flex-col transition-colors duration-300`}
           >
             <div className="px-8 py-10 flex justify-between items-center border-b border-white/5">
                 <div className="flex items-center gap-3">
@@ -459,7 +517,7 @@ export default function App() {
             </div>
             <div className="flex-1 overflow-y-auto p-8 space-y-8 no-scrollbar max-w-4xl mx-auto w-full">
                 {interactions.map(item => (
-                    <div key={item.id} className="p-8 rounded-[32px] bg-[#1a1c1e] border border-white/5 space-y-4">
+                    <div key={item.id} className={`p-8 rounded-[32px] ${isDark ? 'bg-[#1a1c1e] border-white/5' : 'bg-white border-gray-200 shadow-sm'} border space-y-4 transition-colors duration-300`}>
                         <div className="flex justify-between items-center">
                            <div className="flex gap-2">
                              <span className="text-[10px] font-mono font-bold px-2 py-1 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 uppercase">
