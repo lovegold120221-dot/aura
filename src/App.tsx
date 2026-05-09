@@ -142,7 +142,7 @@ export default function App() {
             setConfidence(analysis.confidence || Math.random() * 5 + 94);
 
             if (analysis.language && !isTargetLanguage(analysis.language, targetLanguage)) {
-              setLastNonTargetLanguage(analysis.language);
+              setLastNonTargetLanguage(prev => prev || analysis.language);
             }
 
             if (analysis.translation) {
@@ -185,6 +185,7 @@ export default function App() {
         setCurrentEmotion(null);
         setCurrentLanguage(null);
         setConfidence(0);
+        setLastNonTargetLanguage(null);
       }
       handleDeepgramStart();
     } else {
@@ -460,7 +461,10 @@ export default function App() {
                <Volume2 className="w-5 h-5 sm:w-6 sm:h-6" />
              </button>
              <button 
-               onClick={() => setInteractions([])}
+               onClick={() => {
+                 setInteractions([]);
+                 setLastNonTargetLanguage(null);
+               }}
                className="p-2.5 sm:p-3 text-gray-400 hover:text-white transition-colors"
              >
                <RotateCcw className="w-5 h-5 sm:w-6 sm:h-6" />
