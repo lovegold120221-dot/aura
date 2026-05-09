@@ -38,7 +38,7 @@ export async function speakTranslation(text: string, emotion: string = "Neutral"
     mediaResolution: MediaResolution.MEDIA_RESOLUTION_MEDIUM,
     speechConfig: {
       voiceConfig: {
-        prebuiltVoiceConfig: { voiceName: 'Zephyr' }
+        prebuiltVoiceConfig: { voiceName: 'Orus' }
       }
     },
     systemInstruction: {
