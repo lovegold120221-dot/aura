@@ -5,9 +5,12 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Mic, MicOff, History, Cpu, Zap, Activity, ShieldCheck, Settings, Play, Volume2, RotateCcw, PanelRightClose, PanelRightOpen, Languages, Ghost, Square } from 'lucide-react';
+import { Mic, MicOff, History, Cpu, Zap, Activity, ShieldCheck, Settings, Play, Volume2, RotateCcw, PanelRightClose, PanelRightOpen, Languages, Ghost, Square, LogOut } from 'lucide-react';
 import { analyzeText, speakTranslation } from './services/geminiService';
 import { startDeepgramTranscription, stopDeepgramTranscription } from './services/deepgramService';
+import { auth } from './services/firebase';
+import { onAuthStateChanged, signOut, User } from 'firebase/auth';
+import { AuthPage } from './components/Auth';
 
 interface Interaction {
   id: string;
@@ -20,6 +23,8 @@ interface Interaction {
 }
 
 export default function App() {
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [interactions, setInteractions] = useState<Interaction[]>([]);
   const [streamingInteraction, setStreamingInteraction] = useState<Partial<Interaction> | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -155,11 +160,24 @@ export default function App() {
   };
 
   useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (userToSet) => {
+      setUser(userToSet);
+      setAuthLoading(false);
+    });
     return () => {
+      unsubscribe();
       stopDeepgramTranscription();
     };
   }, []);
   const lastInteraction = streamingInteraction || interactions[0];
+
+  if (authLoading) {
+    return <div className="flex h-screen w-full items-center justify-center bg-[#1a1c1e] text-white">Loading...</div>;
+  }
+
+  if (!user) {
+    return <AuthPage />;
+  }
 
   return (
     <div className="flex h-screen w-full bg-[#1a1c1e] text-[#e2e8f0] font-sans overflow-hidden safe-area-inset relative">
@@ -224,6 +242,13 @@ export default function App() {
               <button className="w-full py-3 px-4 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 flex items-center gap-3 transition-colors text-sm">
                 <Settings className="w-4 h-4 opacity-70" />
                 Preferences
+              </button>
+              <button 
+                onClick={() => signOut(auth)}
+                className="w-full py-3 px-4 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 flex items-center gap-3 transition-colors text-sm text-red-400"
+              >
+                <LogOut className="w-4 h-4 opacity-70" />
+                Sign Out
               </button>
             </div>
           </motion.div>
